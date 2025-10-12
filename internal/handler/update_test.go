@@ -23,6 +23,26 @@ func TestMetricUpdate(t *testing.T) {
 			request: "/update/gauge/HeapObjects/3522.0",
 			want:    want{StatusCode: 200},
 		},
+		{
+			name:    "successfull counter metric update #2",
+			request: "/update/counter/PollCount/2",
+			want:    want{StatusCode: 200},
+		},
+		{
+			name:    "unsuccessfull bad request (wrong url) #3",
+			request: "/\\/\\///",
+			want:    want{StatusCode: 400},
+		},
+		{
+			name:    "unsuccessfull no metric in url #4",
+			request: "/update/gauge/3522.0",
+			want:    want{StatusCode: 404},
+		},
+		{
+			name:    "unsuccessfull wrong metric data  #5",
+			request: "/update/gauge/HeapObjects/3543.0/34534.0",
+			want:    want{StatusCode: 400},
+		},
 	}
 
 	for _, tt := range tests {
