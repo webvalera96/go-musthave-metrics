@@ -34,7 +34,7 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	if metricType == models.Counter {
 		w.Write([]byte(strconv.FormatInt(*metric.Delta, 10)))
 	} else {
-		w.Write([]byte(strconv.FormatFloat(*metric.Value, 'f', 3, 64)))
+		w.Write([]byte(strconv.FormatFloat(*metric.Value, 'f', 2, 64)))
 	}
 
 }
