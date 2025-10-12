@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
@@ -34,7 +35,10 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	if metricType == models.Counter {
 		w.Write([]byte(strconv.FormatInt(*metric.Delta, 10)))
 	} else {
-		w.Write([]byte(strconv.FormatFloat(*metric.Value, 'f', 2, 64)))
+		s := strconv.FormatFloat(*metric.Value, 'f', 3, 64)
+		s = strings.TrimRight(s, "0")
+		s = strings.TrimRight(s, ".")
+		w.Write([]byte(s))
 	}
 
 }
