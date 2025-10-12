@@ -21,14 +21,12 @@ func (ms *MemoryMetricsStorage) Get(k string) (*models.Metrics, error) {
 }
 
 func (ms *MemoryMetricsStorage) Set(m *models.Metrics) error {
-	// if m.MType == models.Counter && ms.data[m.ID] != nil {
-	// 	newDelta := *(ms.data[m.ID].Delta) + *(m.Delta)
-	// 	ms.data[m.ID].Delta = &newDelta
-	// }
-	// if m.MType == models.Counter && ms.data[m.ID] != nil {
-	// 	newDelta := *(ms.data[m.ID].Delta) + *(m.Delta)
-	// 	ms.data[m.ID].Delta = &newDelta
-	// }
+	if m.MType == models.Counter && ms.data[m.ID] != nil {
+		newDelta := *(ms.data[m.ID].Delta) + *(m.Delta)
+		ms.data[m.ID].Delta = &newDelta
+		return nil
+	}
+
 	ms.data[m.ID] = m
 	return nil
 }
