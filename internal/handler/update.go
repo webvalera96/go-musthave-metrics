@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/webvalera96/go-musthave-metrics/internal/model"
+	models "github.com/webvalera96/go-musthave-metrics/internal/model"
 	"github.com/webvalera96/go-musthave-metrics/internal/repository"
 )
 
