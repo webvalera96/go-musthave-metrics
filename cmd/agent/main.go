@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -14,9 +15,9 @@ import (
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
 )
 
-const pollInterval = 2
-const reportInterval = 10
-const baseURL = "localhost:8080" //TODO: move to configuration of agent
+// const pollInterval = 2
+// const reportInterval = 10
+// const baseURL = "localhost:8080" //TODO: move to configuration of agent
 
 var MemoryMetrics = []string{
 	"Alloc",
@@ -113,27 +114,43 @@ func (rm *RuntimeMetrics) SendToMetricsStorage(client *http.Client) error {
 			}
 
 			// send gauge metrics of agent mem stats
-			err := sendMetric(client, baseURL, models.Gauge, metricName, strconv.FormatFloat(metricValue, 'f', 3, 64))
+			err := sendMetric(client, flagMetricsServer, models.Gauge, metricName, strconv.FormatFloat(metricValue, 'f', 3, 64))
 			if err != nil {
 				return err
 			}
 		}
 	}
 	// send poll counts
-	err := sendMetric(client, baseURL, models.Counter, "PollCount", strconv.FormatUint(rm.PollCount, 10))
+	err := sendMetric(client, flagMetricsServer, models.Counter, "PollCount", strconv.FormatUint(rm.PollCount, 10))
 	if err != nil {
 		return err
 	}
 
 	// send random value
-	err = sendMetric(client, baseURL, models.Gauge, "RandomValue", strconv.FormatFloat(rm.RandomValue, 'f', 3, 64))
+	err = sendMetric(client, flagMetricsServer, models.Gauge, "RandomValue", strconv.FormatFloat(rm.RandomValue, 'f', 3, 64))
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
+var flagMetricsServer string
+var flagPollInterval int
+var flagReportPollInterval int
+
+func parseFlags() {
+	flag.StringVar(&flagMetricsServer, "a", "localhost:8080", "address and port of metric server")
+
+	flag.IntVar(&flagPollInterval, "p", 2, "poll interval in seconds")
+
+	flag.IntVar(&flagReportPollInterval, "r", 10, "report interval in seconds")
+
+	flag.Parse()
+}
+
 func main() {
+
+	parseFlags()
 
 	var wg sync.WaitGroup
 
@@ -147,7 +164,7 @@ func main() {
 		defer wg.Done()
 		for {
 			// Pause between metrics gathering
-			time.Sleep(time.Second * pollInterval)
+			time.Sleep(time.Second * time.Duration(flagPollInterval))
 
 			// update current runtimeMetrics
 			var rm runtime.MemStats
@@ -161,7 +178,7 @@ func main() {
 		defer wg.Done()
 		for {
 			// Pause between metrics sending
-			time.Sleep(time.Second * reportInterval)
+			time.Sleep(time.Second * time.Duration(flagReportPollInterval))
 			runtimeMetrics.SendToMetricsStorage(client)
 		}
 	}(&wg, &runtimeMetrics, &client)
