@@ -113,7 +113,7 @@ func (rm *RuntimeMetrics) SendToMetricsStorage(client *http.Client) error {
 			}
 
 			// send gauge metrics of agent mem stats
-			err := sendMetric(client, baseURL, models.Gauge, metricName, strconv.FormatFloat(metricValue, 'f', 2, 64))
+			err := sendMetric(client, baseURL, models.Gauge, metricName, strconv.FormatFloat(metricValue, 'f', 6, 64))
 			if err != nil {
 				return err
 			}
@@ -126,7 +126,7 @@ func (rm *RuntimeMetrics) SendToMetricsStorage(client *http.Client) error {
 	}
 
 	// send random value
-	err = sendMetric(client, baseURL, models.Gauge, "RandomValue", strconv.FormatFloat(rm.RandomValue, 'f', 2, 64))
+	err = sendMetric(client, baseURL, models.Gauge, "RandomValue", strconv.FormatFloat(rm.RandomValue, 'f', 6, 64))
 	if err != nil {
 		return err
 	}
