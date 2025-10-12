@@ -33,6 +33,7 @@ func TestMetricUpdate(t *testing.T) {
 			h(w, request)
 
 			result := w.Result()
+			defer result.Body.Close()
 			assert.Equal(t, tt.want.StatusCode, result.StatusCode)
 		})
 	}
