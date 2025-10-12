@@ -16,7 +16,7 @@ import (
 
 const pollInterval = 2
 const reportInterval = 10
-const baseUrl = "localhost:8080" //TODO: move to configuration of agent
+const baseURL = "localhost:8080" //TODO: move to configuration of agent
 
 var MemoryMetrics = []string{
 	"Alloc",
@@ -70,8 +70,8 @@ func (rm *RuntimeMetrics) Get() runtime.MemStats {
 }
 
 func sendMetric(client *http.Client, baseUrl string, metricType string, metricName string, metricValue string) error {
-	requestUrl := fmt.Sprintf("http://%s/update/%s/%s/%s", baseUrl, metricType, metricName, metricValue)
-	request, err := http.NewRequest(http.MethodPost, requestUrl, nil)
+	requestURL := fmt.Sprintf("http://%s/update/%s/%s/%s", baseUrl, metricType, metricName, metricValue)
+	request, err := http.NewRequest(http.MethodPost, requestURL, nil)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func sendMetric(client *http.Client, baseUrl string, metricType string, metricNa
 	if response.StatusCode != http.StatusOK {
 		return fmt.Errorf("[%s] unable to send metric: %s, with value %s", time.Now().Format(time.RFC3339), metricName, metricValue)
 	} else {
-		fmt.Printf("[%s] %s is ok\n", time.Now().Format(time.RFC3339), requestUrl)
+		fmt.Printf("[%s] %s is ok\n", time.Now().Format(time.RFC3339), requestURL)
 	}
 
 	return nil
@@ -113,20 +113,20 @@ func (rm *RuntimeMetrics) SendToMetricsStorage(client *http.Client) error {
 			}
 
 			// send gauge metrics of agent mem stats
-			err := sendMetric(client, baseUrl, models.Gauge, metricName, strconv.FormatFloat(metricValue, 'f', 2, 64))
+			err := sendMetric(client, baseURL, models.Gauge, metricName, strconv.FormatFloat(metricValue, 'f', 2, 64))
 			if err != nil {
 				return err
 			}
 		}
 	}
 	// send poll counts
-	err := sendMetric(client, baseUrl, models.Counter, "PollCount", strconv.FormatUint(rm.PollCount, 10))
+	err := sendMetric(client, baseURL, models.Counter, "PollCount", strconv.FormatUint(rm.PollCount, 10))
 	if err != nil {
 		return err
 	}
 
 	// send random value
-	err = sendMetric(client, baseUrl, models.Gauge, "RandomValue", strconv.FormatFloat(rm.RandomValue, 'f', 2, 64))
+	err = sendMetric(client, baseURL, models.Gauge, "RandomValue", strconv.FormatFloat(rm.RandomValue, 'f', 2, 64))
 	if err != nil {
 		return err
 	}
