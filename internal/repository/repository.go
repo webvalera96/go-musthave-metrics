@@ -1,16 +1,23 @@
 package repository
 
 import (
-	"github.com/webvalera96/go-musthave-metrics/internal/model"
+	"errors"
 	"sync"
+
+	models "github.com/webvalera96/go-musthave-metrics/internal/model"
 )
 
 type MemoryMetricsStorage struct {
 	data map[string](*models.Metrics)
 }
 
-func (ms *MemoryMetricsStorage) Get(k string) *models.Metrics {
-	return ms.data[k]
+func (ms *MemoryMetricsStorage) Get(k string) (*models.Metrics, error) {
+	value, exists := ms.data[k]
+	if !exists {
+		return nil, errors.New("metric not exists")
+	} else {
+		return value, nil
+	}
 }
 
 func (ms *MemoryMetricsStorage) Set(m *models.Metrics) error {

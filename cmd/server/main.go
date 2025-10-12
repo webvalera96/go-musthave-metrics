@@ -1,16 +1,18 @@
 package main
 
 import (
-	"github.com/webvalera96/go-musthave-metrics/internal/handler"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/webvalera96/go-musthave-metrics/internal/handler"
 )
 
 func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/update/", handler.Update)
+	r := chi.NewRouter()
+	r.Post("/update/{metricType}/{metricName}/{metricValue}", handler.Update)
+	r.Get("/value/{metricType}/{metricName}", handler.Get)
 
-	if err := http.ListenAndServe(":8080", mux); err != nil {
+	if err := http.ListenAndServe(":8080", r); err != nil {
 		panic(err)
 	}
-
 }
