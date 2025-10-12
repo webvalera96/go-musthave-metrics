@@ -69,8 +69,8 @@ func (rm *RuntimeMetrics) Get() runtime.MemStats {
 	return rm.RuntimeMemoryMetrics
 }
 
-func sendMetric(client *http.Client, baseUrl string, metricType string, metricName string, metricValue string) error {
-	requestURL := fmt.Sprintf("http://%s/update/%s/%s/%s", baseUrl, metricType, metricName, metricValue)
+func sendMetric(client *http.Client, baseURL string, metricType string, metricName string, metricValue string) error {
+	requestURL := fmt.Sprintf("http://%s/update/%s/%s/%s", baseURL, metricType, metricName, metricValue)
 	request, err := http.NewRequest(http.MethodPost, requestURL, nil)
 	if err != nil {
 		return err
