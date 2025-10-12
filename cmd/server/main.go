@@ -32,7 +32,7 @@ func run() error {
 	r.Post("/update/{metricType}/{metricName}/{metricValue}", handler.Update)
 	r.Get("/value/{metricType}/{metricName}", handler.Get)
 
-	if err := http.ListenAndServe(":8080", r); err != nil {
+	if err := http.ListenAndServe(flagRunAddr, r); err != nil {
 		return err
 	}
 	return nil
