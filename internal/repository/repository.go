@@ -3,12 +3,14 @@ package repository
 import (
 	"context"
 	"errors"
+	"sync"
 
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
 	"go.uber.org/fx"
 )
 
 type MemoryMetricsStorage struct {
+	mu   sync.Mutex
 	data map[string](*models.Metrics)
 }
 
@@ -17,6 +19,8 @@ func (ms *MemoryMetricsStorage) Make() {
 }
 
 func (ms *MemoryMetricsStorage) Get(k string) (*models.Metrics, error) {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
 	value, exists := ms.data[k]
 	if !exists {
 		return nil, errors.New("metric not exists")
@@ -26,6 +30,8 @@ func (ms *MemoryMetricsStorage) Get(k string) (*models.Metrics, error) {
 }
 
 func (ms *MemoryMetricsStorage) Set(m *models.Metrics) error {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
 	if m.MType == models.Counter && ms.data[m.ID] != nil {
 		newDelta := *(ms.data[m.ID].Delta) + *(m.Delta)
 		ms.data[m.ID].Delta = &newDelta

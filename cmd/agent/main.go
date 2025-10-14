@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"slices"
 	"strconv"
+	"sync"
 	"time"
 
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
@@ -51,18 +52,23 @@ var MemoryMetrics = []string{
 }
 
 type RuntimeMetrics struct {
+	mu                   sync.Mutex
 	RuntimeMemoryMetrics runtime.MemStats
 	PollCount            uint64
 	RandomValue          float64
 }
 
 func (rm *RuntimeMetrics) Set(m runtime.MemStats) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
 	rm.RuntimeMemoryMetrics = m
 	rm.PollCount++
 	rm.RandomValue = rand.Float64()
 }
 
 func (rm *RuntimeMetrics) Get() runtime.MemStats {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
 	return rm.RuntimeMemoryMetrics
 }
 
