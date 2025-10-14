@@ -16,7 +16,13 @@ const (
 	MetricValue = 2
 )
 
-func Update(w http.ResponseWriter, r *http.Request) {
+type UpdateHandler struct{}
+
+func NewUpdateHandler() *UpdateHandler {
+	return &UpdateHandler{}
+}
+
+func (*UpdateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s := repository.GetInstance()
 
 	metricType := chi.URLParam(r, "metricType")

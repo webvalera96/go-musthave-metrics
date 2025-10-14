@@ -10,7 +10,13 @@ import (
 	"github.com/webvalera96/go-musthave-metrics/internal/repository"
 )
 
-func Get(w http.ResponseWriter, r *http.Request) {
+type GetHandler struct{}
+
+func NewGetHandler() *GetHandler {
+	return &GetHandler{}
+}
+
+func (*GetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "metricType")
 	if metricType == "" {
 		http.Error(w, "No metric type", http.StatusBadRequest)

@@ -66,7 +66,7 @@ func TestMetricUpdate(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, tt.request, nil)
 			request = AddChiURLParams(request, tt.chiParams)
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(Update)
+			h := http.HandlerFunc(NewUpdateHandler().ServeHTTP)
 			h(w, request)
 
 			result := w.Result()
