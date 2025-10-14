@@ -1,20 +1,22 @@
 package repository
 
 import (
+	"context"
 	"errors"
-	"sync"
 
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
+	"go.uber.org/fx"
 )
 
 type MemoryMetricsStorage struct {
-	mu   sync.Mutex
 	data map[string](*models.Metrics)
 }
 
+func (ms *MemoryMetricsStorage) Make() {
+	ms.data = make(map[string](*models.Metrics))
+}
+
 func (ms *MemoryMetricsStorage) Get(k string) (*models.Metrics, error) {
-	ms.mu.Lock()
-	defer ms.mu.Unlock()
 	value, exists := ms.data[k]
 	if !exists {
 		return nil, errors.New("metric not exists")
@@ -24,8 +26,6 @@ func (ms *MemoryMetricsStorage) Get(k string) (*models.Metrics, error) {
 }
 
 func (ms *MemoryMetricsStorage) Set(m *models.Metrics) error {
-	ms.mu.Lock()
-	defer ms.mu.Unlock()
 	if m.MType == models.Counter && ms.data[m.ID] != nil {
 		newDelta := *(ms.data[m.ID].Delta) + *(m.Delta)
 		ms.data[m.ID].Delta = &newDelta
@@ -41,16 +41,17 @@ type MetricsStorage interface {
 	Add(k string, m *models.Metrics) error
 }
 
-var (
-	storage *MemoryMetricsStorage
-	once    sync.Once
-)
-
-func GetInstance() *MemoryMetricsStorage {
-	once.Do(func() {
-		storage = &MemoryMetricsStorage{
-			data: make(map[string](*models.Metrics)),
-		}
+func CreateMemoryMetricsStorage(lc fx.Lifecycle) *MemoryMetricsStorage {
+	storage := MemoryMetricsStorage{}
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			storage.Make()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			storage = MemoryMetricsStorage{}
+			return nil
+		},
 	})
-	return storage
+	return &storage
 }

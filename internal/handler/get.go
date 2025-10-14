@@ -10,13 +10,15 @@ import (
 	"github.com/webvalera96/go-musthave-metrics/internal/repository"
 )
 
-type GetHandler struct{}
-
-func NewGetHandler() *GetHandler {
-	return &GetHandler{}
+type GetHandler struct {
+	metricStorage *repository.MemoryMetricsStorage
 }
 
-func (*GetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func NewGetHandler(ms *repository.MemoryMetricsStorage) *GetHandler {
+	return &GetHandler{metricStorage: ms}
+}
+
+func (gh *GetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "metricType")
 	if metricType == "" {
 		http.Error(w, "No metric type", http.StatusBadRequest)
@@ -29,8 +31,7 @@ func (*GetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metricStorage := repository.GetInstance()
-	metric, err := metricStorage.Get(metricName)
+	metric, err := gh.metricStorage.Get(metricName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return

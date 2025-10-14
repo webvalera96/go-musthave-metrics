@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/webvalera96/go-musthave-metrics/internal/handler"
+	"github.com/webvalera96/go-musthave-metrics/internal/repository"
 	"go.uber.org/fx"
 )
 
@@ -28,6 +29,7 @@ func main() {
 
 	fx.New(
 		fx.Provide(
+			repository.CreateMemoryMetricsStorage,
 			NewHTTPServer,
 			NewChiMux,
 			handler.NewGetHandler,

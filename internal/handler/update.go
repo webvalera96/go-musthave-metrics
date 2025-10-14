@@ -16,14 +16,15 @@ const (
 	MetricValue = 2
 )
 
-type UpdateHandler struct{}
-
-func NewUpdateHandler() *UpdateHandler {
-	return &UpdateHandler{}
+type UpdateHandler struct {
+	metricStorage *repository.MemoryMetricsStorage
 }
 
-func (*UpdateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s := repository.GetInstance()
+func NewUpdateHandler(ms *repository.MemoryMetricsStorage) *UpdateHandler {
+	return &UpdateHandler{metricStorage: ms}
+}
+
+func (uh *UpdateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	metricType := chi.URLParam(r, "metricType")
 	if metricType == "" {
@@ -50,7 +51,7 @@ func (*UpdateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = s.Set(&models.Metrics{
+		err = uh.metricStorage.Set(&models.Metrics{
 			ID:    metricName,
 			MType: models.Counter,
 			Delta: &cv,
@@ -68,7 +69,7 @@ func (*UpdateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = s.Set(&models.Metrics{
+		err = uh.metricStorage.Set(&models.Metrics{
 			ID:    metricName,
 			MType: models.Gauge,
 			Value: &gv,
