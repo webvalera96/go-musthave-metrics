@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -9,10 +10,10 @@ import (
 	"runtime"
 	"slices"
 	"strconv"
-	"sync"
 	"time"
 
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
+	"go.uber.org/fx"
 )
 
 // const pollInterval = 2
@@ -50,23 +51,18 @@ var MemoryMetrics = []string{
 }
 
 type RuntimeMetrics struct {
-	mu                   sync.Mutex
 	RuntimeMemoryMetrics runtime.MemStats
 	PollCount            uint64
 	RandomValue          float64
 }
 
 func (rm *RuntimeMetrics) Set(m runtime.MemStats) {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
 	rm.RuntimeMemoryMetrics = m
 	rm.PollCount++
 	rm.RandomValue = rand.Float64()
 }
 
 func (rm *RuntimeMetrics) Get() runtime.MemStats {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
 	return rm.RuntimeMemoryMetrics
 }
 
@@ -148,41 +144,61 @@ func parseFlags() {
 	flag.Parse()
 }
 
+func MetricsUpdater(lc fx.Lifecycle) *RuntimeMetrics {
+	rm := RuntimeMetrics{}
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			go func() {
+				for {
+					// Pause between metrics gathering
+					time.Sleep(time.Second * time.Duration(flagPollInterval))
+
+					// update current runtimeMetrics
+					var m runtime.MemStats
+					runtime.ReadMemStats(&m)
+					rm.Set(m)
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			rm = RuntimeMetrics{}
+			return nil
+		},
+	})
+	return &rm
+}
+
+func MetricsSender(lc fx.Lifecycle, runtimeMetrics *RuntimeMetrics) *http.Client {
+	client := http.Client{}
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			go func() {
+				for {
+					time.Sleep(time.Second * time.Duration(flagReportPollInterval))
+					runtimeMetrics.SendToMetricsStorage(&client)
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			client.CloseIdleConnections()
+			return nil
+		},
+	})
+	return &client
+}
+
 func main() {
 
 	parseFlags()
 
-	var wg sync.WaitGroup
-
-	wg.Add(2)
-
-	var runtimeMetrics RuntimeMetrics
-	client := http.Client{}
-
-	// thread to update metrics
-	go func(wg *sync.WaitGroup, runtimeMetrics *RuntimeMetrics) {
-		defer wg.Done()
-		for {
-			// Pause between metrics gathering
-			time.Sleep(time.Second * time.Duration(flagPollInterval))
-
-			// update current runtimeMetrics
-			var rm runtime.MemStats
-			runtime.ReadMemStats(&rm)
-			runtimeMetrics.Set(rm)
-		}
-	}(&wg, &runtimeMetrics)
-
-	// thread to periodically send metrics on server
-	go func(wg *sync.WaitGroup, runtimeMetrics *RuntimeMetrics, client *http.Client) {
-		defer wg.Done()
-		for {
-			// Pause between metrics sending
-			time.Sleep(time.Second * time.Duration(flagReportPollInterval))
-			runtimeMetrics.SendToMetricsStorage(client)
-		}
-	}(&wg, &runtimeMetrics, &client)
-
-	wg.Wait()
+	fx.New(
+		fx.Provide(
+			MetricsUpdater,
+			MetricsSender,
+		),
+		fx.Invoke(func(*http.Client) {}),
+	).Run()
 
 }
