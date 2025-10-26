@@ -148,13 +148,15 @@ const (
 
 func parseFlags() {
 	// Parse metrics server address
-	flagMetricsServer, exist := os.LookupEnv(EnvAddress)
+	var exist bool
+	flagMetricsServer, exist = os.LookupEnv(EnvAddress)
 	if !exist {
 		flag.StringVar(&flagMetricsServer, "a", "localhost:8080", "address and port of metric server")
 	}
 
 	// Parse poll interval
-	pollInterval, exist := os.LookupEnv(EnvPollInterval)
+	var pollInterval string
+	pollInterval, exist = os.LookupEnv(EnvPollInterval)
 	if exist {
 		var err error
 		flagPollInterval, err = strconv.Atoi(pollInterval)
@@ -167,7 +169,8 @@ func parseFlags() {
 	}
 
 	// Parse flagreport interval
-	reportPollInterval, exist := os.LookupEnv(EnvReportInterval)
+	var reportPollInterval string
+	reportPollInterval, exist = os.LookupEnv(EnvReportInterval)
 	if exist {
 		var err error
 		flagReportPollInterval, err = strconv.Atoi(reportPollInterval)

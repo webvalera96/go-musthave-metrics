@@ -17,12 +17,12 @@ const (
 )
 
 func parseFlags() {
-	flagRunAddr, exist := os.LookupEnv(EnvAddress)
+	var exist bool
+	flagRunAddr, exist = os.LookupEnv(EnvAddress)
 	if !exist {
 		flag.StringVar(&flagRunAddr, "a", "localhost:8080", "address and port to run server")
+		flag.Parse()
 	}
-
-	flag.Parse()
 }
 
 func main() {
