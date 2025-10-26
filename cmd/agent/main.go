@@ -3,8 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"reflect"
 	"runtime"
 	"slices"
@@ -138,12 +140,44 @@ var flagMetricsServer string
 var flagPollInterval int
 var flagReportPollInterval int
 
+const (
+	ENV_ADDRESS         = "ADDRESS"
+	ENV_REPORT_INTERVAL = "REPORT_INTERVAL"
+	ENV_POLL_INTERVAL   = "POLL_INTERVAL"
+)
+
 func parseFlags() {
-	flag.StringVar(&flagMetricsServer, "a", "localhost:8080", "address and port of metric server")
+	// Parse metrics server address
+	flagMetricsServer, exist := os.LookupEnv(ENV_ADDRESS)
+	if !exist {
+		flag.StringVar(&flagMetricsServer, "a", "localhost:8080", "address and port of metric server")
+	}
 
-	flag.IntVar(&flagPollInterval, "p", 2, "poll interval in seconds")
+	// Parse poll interval
+	pollInterval, exist := os.LookupEnv(ENV_POLL_INTERVAL)
+	if exist {
+		var err error
+		flagPollInterval, err = strconv.Atoi(pollInterval)
 
-	flag.IntVar(&flagReportPollInterval, "r", 10, "report interval in seconds")
+		if err != nil {
+			log.Fatal("unable to parse POLL_INTERVAL env value")
+		}
+	} else {
+		flag.IntVar(&flagPollInterval, "p", 2, "poll interval in seconds")
+	}
+
+	// Parse flagreport interval
+	reportPollInterval, exist := os.LookupEnv()
+	if exist {
+		var err error
+		flagReportPollInterval, err = strconv.Atoi(reportPollInterval)
+
+		if err != nil {
+			log.Fatal("unable to parse REPORT_INTERVAL env value")
+		}
+	} else {
+		flag.IntVar(&flagReportPollInterval, "r", 10, "report interval in seconds")
+	}
 
 	flag.Parse()
 }
