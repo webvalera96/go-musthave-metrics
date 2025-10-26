@@ -141,20 +141,20 @@ var flagPollInterval int
 var flagReportPollInterval int
 
 const (
-	ENV_ADDRESS         = "ADDRESS"
-	ENV_REPORT_INTERVAL = "REPORT_INTERVAL"
-	ENV_POLL_INTERVAL   = "POLL_INTERVAL"
+	EnvAddress        = "ADDRESS"
+	EnvReportInterval = "REPORT_INTERVAL"
+	EnvPollInterval   = "POLL_INTERVAL"
 )
 
 func parseFlags() {
 	// Parse metrics server address
-	flagMetricsServer, exist := os.LookupEnv(ENV_ADDRESS)
+	flagMetricsServer, exist := os.LookupEnv(EnvAddress)
 	if !exist {
 		flag.StringVar(&flagMetricsServer, "a", "localhost:8080", "address and port of metric server")
 	}
 
 	// Parse poll interval
-	pollInterval, exist := os.LookupEnv(ENV_POLL_INTERVAL)
+	pollInterval, exist := os.LookupEnv(EnvPollInterval)
 	if exist {
 		var err error
 		flagPollInterval, err = strconv.Atoi(pollInterval)
@@ -167,7 +167,7 @@ func parseFlags() {
 	}
 
 	// Parse flagreport interval
-	reportPollInterval, exist := os.LookupEnv(ENV_REPORT_INTERVAL)
+	reportPollInterval, exist := os.LookupEnv(EnvReportInterval)
 	if exist {
 		var err error
 		flagReportPollInterval, err = strconv.Atoi(reportPollInterval)
