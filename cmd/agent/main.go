@@ -167,7 +167,7 @@ func parseFlags() {
 	}
 
 	// Parse flagreport interval
-	reportPollInterval, exist := os.LookupEnv()
+	reportPollInterval, exist := os.LookupEnv(ENV_REPORT_INTERVAL)
 	if exist {
 		var err error
 		flagReportPollInterval, err = strconv.Atoi(reportPollInterval)
