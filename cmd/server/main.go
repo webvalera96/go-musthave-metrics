@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/webvalera96/go-musthave-metrics/internal/handler"
@@ -15,12 +16,17 @@ import (
 
 var flagRunAddr string
 
+const (
+	EnvAddress = "ADDRESS"
+)
+
 func parseFlags() {
-	// регистрируем переменную flagRunAddr
-	// как аргумент -a со значением :8080 по умолчанию
-	flag.StringVar(&flagRunAddr, "a", "localhost:8080", "address and port to run server")
-	// парсим переданные серверу аргументы в зарегистрированные переменные
-	flag.Parse()
+	var exist bool
+	flagRunAddr, exist = os.LookupEnv(EnvAddress)
+	if !exist {
+		flag.StringVar(&flagRunAddr, "a", "localhost:8080", "address and port to run server")
+		flag.Parse()
+	}
 }
 
 func main() {
