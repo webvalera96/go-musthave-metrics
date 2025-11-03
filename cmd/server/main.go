@@ -39,6 +39,7 @@ func main() {
 		fx.Provide(
 			repository.CreateMemoryMetricsStorage,
 			NewHTTPServer,
+			NewSugaredLogger,
 			NewChiMux,
 			handler.NewGetHandler,
 			handler.NewUpdateHandler,
@@ -47,11 +48,28 @@ func main() {
 	).Run()
 }
 
-func NewChiMux(updateHandler *handler.UpdateHandler, getHandler *handler.GetHandler) *chi.Mux {
+func NewChiMux(updateHandler *handler.UpdateHandler, getHandler *handler.GetHandler, sugar *zap.SugaredLogger) *chi.Mux {
 	r := chi.NewRouter()
-	r.Post("/update/{metricType}/{metricName}/{metricValue}", http.HandlerFunc(log.WithLogging(updateHandler, zap.SugaredLogger{}).ServeHTTP))
-	r.Get("/value/{metricType}/{metricName}", http.HandlerFunc(log.WithLogging(getHandler, zap.SugaredLogger{}).ServeHTTP))
+	r.Post("/update/{metricType}/{metricName}/{metricValue}", http.HandlerFunc(log.WithLogging(updateHandler, sugar).ServeHTTP))
+	r.Get("/value/{metricType}/{metricName}", http.HandlerFunc(log.WithLogging(getHandler, sugar).ServeHTTP))
 	return r
+}
+
+func NewSugaredLogger() *zap.SugaredLogger {
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	defer func(logger *zap.Logger) {
+		err := logger.Sync()
+		if err != nil {
+
+		}
+	}(logger)
+
+	sugar := *logger.Sugar()
+
+	return &sugar
 }
 
 func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux) *http.Server {
