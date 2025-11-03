@@ -43,15 +43,26 @@ func main() {
 			NewChiMux,
 			handler.NewGetHandler,
 			handler.NewUpdateHandler,
+			handler.NewGetJSONHandler,
+			handler.NewUpdateJSONHandler,
 		),
 		fx.Invoke(func(*http.Server) {}),
 	).Run()
 }
 
-func NewChiMux(updateHandler *handler.UpdateHandler, getHandler *handler.GetHandler, sugar *zap.SugaredLogger) *chi.Mux {
+func NewChiMux(
+	updateHandler *handler.UpdateHandler,
+	getHandler *handler.GetHandler,
+	updateJSONHandler *handler.UpdateJSONHandler,
+	getJSONHandler *handler.GetJSONHandler,
+	sugar *zap.SugaredLogger,
+) *chi.Mux {
 	r := chi.NewRouter()
+
 	r.Post("/update/{metricType}/{metricName}/{metricValue}", http.HandlerFunc(log.WithLogging(updateHandler, sugar).ServeHTTP))
 	r.Get("/value/{metricType}/{metricName}", http.HandlerFunc(log.WithLogging(getHandler, sugar).ServeHTTP))
+	r.Post("/update/", http.HandlerFunc(log.WithLogging(updateJSONHandler, sugar).ServeHTTP))
+	r.Post("/value/", http.HandlerFunc(log.WithLogging(getJSONHandler, sugar).ServeHTTP))
 	return r
 }
 

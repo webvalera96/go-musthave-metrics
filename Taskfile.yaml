@@ -8,12 +8,29 @@ tasks:
     cmds:
       - go build -o cmd/server/server.exe cmd/server/main.go
 
+  _buildServerDarwin:
+    desc: "Internal: Build server (darwin)"
+    internal: true
+    platforms:
+      - darwin
+    cmds:
+      - go build -o cmd/server/server cmd/server/main.go
+
+
   _buildAgentWindows:
     desc: "Internal: Build agent (windows)"
     internal: true
     platforms: [ windows ]
     cmds:
       - go build -o cmd/agent/agent.exe cmd/agent/main.go
+
+  _buildAgentDarwin:
+    desc: "Internal: Build agent (darwin)"
+    internal: true
+    platforms:
+      - darwin
+    cmds:
+      - go build -o cmd/agent/agent cmd/agent/main.go
 
   _downloadAutoTestsWindows:
     desc: "Internal: Download autotest (windows)"
@@ -23,8 +40,17 @@ tasks:
     cmds:
       - curl -L -O https://github.com/Yandex-Practicum/go-autotests/releases/download/v0.13.2/metricstest-windows-amd64.exe
 
-  _runAutoTestsServerWindows:
-    desc: "Internal: Run autotest for server (windows)"
+  _downloadAutoTestsDarwin:
+    desc: "Internal: Download autotest (darwin)"
+    internal: true
+    platforms:
+      - darwin
+    cmds:
+      - curl -L -O https://github.com/Yandex-Practicum/go-autotests/releases/download/v0.13.2/metricstest-darwin-arm64
+      - chmod +x metricstest-darwin-arm64
+
+  _runAutoTestsWindows:
+    desc: "Internal: Run autotest (windows)"
     internal: true
     platforms:
       - windows/amd64
@@ -36,15 +62,33 @@ tasks:
       - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration5$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=.
       - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration6$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=.
 
+  _runAutoTestsDarwin:
+    desc: "Internal: Run auotest (darwin)"
+    platforms:
+      - darwin
+    cmds:
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration1$ -binary-path=cmd/server/server
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration2$ -binary-path=cmd/server/server
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration3$ -binary-path=cmd/server/server
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration4$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration5$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration6$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
+  _runAutoTestDarwin:
+    desc: "Internal: Run autotest"
+
   build:
     desc: "Build server and agent"
     cmds:
       - task: _buildServerWindows
       - task: _buildAgentWindows
+      - task: _buildServerDarwin
+      - task: _buildAgentDarwin
 
   test:
     desc: "Run autotest"
     cmds:
       - task: build
       - task: _downloadAutoTestsWindows
-      - task: _runAutoTestsServerWindows
+      - task: _downloadAutoTestsDarwin
+      - task: _runAutoTestsWindows
+      - task: _runAutoTestsDarwin
