@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -32,14 +33,14 @@ var MemoryMetrics = []string{
 	"GCCPUFraction",
 	"GCSys",
 	"HeapAlloc",
-	"HeapIdel",
+	"HeapIdle",
 	"HeapInuse",
 	"HeapObjects",
 	"HeapReleased",
 	"HeapSys",
 	"LastGC",
 	"Lookups",
-	"McacheInuse",
+	"MCacheInuse",
 	"MCacheSys",
 	"MSpanInuse",
 	"MSpanSys",
@@ -87,12 +88,10 @@ func sendMetric(client *http.Client, baseURL string, metricType string, metricNa
 			return err
 		}
 
-		var zeroFloat float64 = 0
 		metric = models.Metrics{
 			ID:    metricName,
 			MType: models.Counter,
 			Delta: &delta,
-			Value: &zeroFloat,
 		}
 	} else if metricType == models.Gauge {
 		value, err := strconv.ParseFloat(metricValue, 64)
@@ -100,11 +99,9 @@ func sendMetric(client *http.Client, baseURL string, metricType string, metricNa
 			return err
 		}
 
-		var zeroInt64 int64 = 0
 		metric = models.Metrics{
 			ID:    metricName,
-			MType: models.Counter,
-			Delta: &zeroInt64,
+			MType: models.Gauge,
 			Value: &value,
 		}
 	} else {
@@ -116,15 +113,12 @@ func sendMetric(client *http.Client, baseURL string, metricType string, metricNa
 		return err
 	}
 
-	request, err := http.NewRequest(http.MethodPost, requestURL, nil)
+	request, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
 	request.Header.Set("Content-Type", "application/json")
-	_, err = request.Body.Read(body)
-	if err != nil {
-		return err
-	}
+
 	response, err := client.Do(request)
 	if err != nil {
 		return err

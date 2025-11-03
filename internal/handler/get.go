@@ -40,9 +40,28 @@ func (gh *GetJSONHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 	}
 
-	err = getMetric(data.MType, data.ID, gh.metricStorage, w)
+	metric, err := gh.metricStorage.Get(data.ID)
 	if err != nil {
-		log.Print(err)
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	if metric != nil {
+		raw, err := json.Marshal(metric)
+		if err != nil {
+			http.Error(w, "Invalid JSON", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write(raw)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 	}
 }
 

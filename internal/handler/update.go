@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -48,25 +49,30 @@ func (uh *UpdateJSONHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 	}
 
-	if data.Delta == nil {
-		var zero int64 = 0
-		data.Delta = &zero
+	if data.MType == models.Counter {
+		if data.Delta == nil {
+			err = errors.New("delta is empty")
+		}
+		err = uh.metricStorage.Set(&models.Metrics{
+			ID:    data.ID,
+			MType: data.MType,
+			Delta: data.Delta,
+		})
+	} else if data.MType == models.Gauge {
+		if data.Value == nil {
+			err = errors.New("value is empty")
+		}
+		err = uh.metricStorage.Set(&models.Metrics{
+			ID:    data.ID,
+			MType: data.MType,
+			Value: data.Value,
+		})
+	} else {
+		err = errors.New("not known type of metrics")
 	}
-
-	if data.Value == nil {
-		var zero float64 = 0
-		data.Value = &zero
-	}
-
-	err = uh.metricStorage.Set(&models.Metrics{
-		ID:    data.ID,
-		MType: data.MType,
-		Delta: data.Delta,
-		Value: data.Value,
-	})
 
 	if err != nil {
-		http.Error(w, "Unable to save metric", http.StatusServiceUnavailable)
+		http.Error(w, fmt.Sprintf("Unable to save metric: (%s)", err), http.StatusServiceUnavailable)
 		return
 	}
 
