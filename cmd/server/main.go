@@ -59,10 +59,25 @@ func NewChiMux(
 ) *chi.Mux {
 	r := chi.NewRouter()
 
-	r.Post("/update/{metricType}/{metricName}/{metricValue}", http.HandlerFunc(log.WithLogging(updateHandler, sugar).ServeHTTP))
-	r.Get("/value/{metricType}/{metricName}", http.HandlerFunc(log.WithLogging(getHandler, sugar).ServeHTTP))
-	r.Post("/update/", http.HandlerFunc(log.WithLogging(updateJSONHandler, sugar).ServeHTTP))
-	r.Post("/value/", http.HandlerFunc(log.WithLogging(getJSONHandler, sugar).ServeHTTP))
+	r.Post(
+		"/update/{metricType}/{metricName}/{metricValue}",
+		http.HandlerFunc(log.WithLogging(updateHandler, sugar).ServeHTTP),
+	)
+
+	r.Get(
+		"/value/{metricType}/{metricName}",
+		http.HandlerFunc(log.WithLogging(getHandler, sugar).ServeHTTP),
+	)
+
+	r.Post(
+		"/update/",
+		http.HandlerFunc(log.WithLogging(updateJSONHandler, sugar).ServeHTTP),
+	)
+
+	r.Post("/value/",
+		http.HandlerFunc(log.WithLogging(getJSONHandler, sugar).ServeHTTP),
+	)
+
 	return r
 }
 
