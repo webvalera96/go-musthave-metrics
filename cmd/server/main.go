@@ -10,8 +10,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/webvalera96/go-musthave-metrics/internal/handler"
+	"github.com/webvalera96/go-musthave-metrics/internal/handler/log"
 	"github.com/webvalera96/go-musthave-metrics/internal/repository"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 )
 
 var flagRunAddr string
@@ -47,8 +49,8 @@ func main() {
 
 func NewChiMux(updateHandler *handler.UpdateHandler, getHandler *handler.GetHandler) *chi.Mux {
 	r := chi.NewRouter()
-	r.Post("/update/{metricType}/{metricName}/{metricValue}", http.HandlerFunc(updateHandler.ServeHTTP))
-	r.Get("/value/{metricType}/{metricName}", http.HandlerFunc(getHandler.ServeHTTP))
+	r.Post("/update/{metricType}/{metricName}/{metricValue}", http.HandlerFunc(log.WithLogging(updateHandler, zap.SugaredLogger{}).ServeHTTP))
+	r.Get("/value/{metricType}/{metricName}", http.HandlerFunc(log.WithLogging(getHandler, zap.SugaredLogger{}).ServeHTTP))
 	return r
 }
 
@@ -61,7 +63,12 @@ func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux) *http.Server {
 				return err
 			}
 			fmt.Println("Starting HTTP serve at", srv.Addr)
-			go srv.Serve(ln)
+			go func() {
+				err := srv.Serve(ln)
+				if err != nil {
+					panic(err)
+				}
+			}()
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
