@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -26,35 +28,21 @@ func NewGetHandler(ms *repository.MemoryMetricsStorage) *GetHandler {
 	return &GetHandler{metricStorage: ms}
 }
 
-// TODO: reimplement JSON logic
 func (gh *GetJSONHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	metricType := chi.URLParam(r, "metricType")
-	if metricType == "" {
-		http.Error(w, "No metric type", http.StatusBadRequest)
+	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "wrong content type", http.StatusBadRequest)
 		return
 	}
+	var data models.Metrics
 
-	metricName := chi.URLParam(r, "metricName")
-	if metricName == "" {
-		http.Error(w, "No metric name", http.StatusBadRequest)
-		return
-	}
-
-	metric, err := gh.metricStorage.Get(metricName)
+	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 	}
 
-	w.Header().Add("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusOK)
-	if metricType == models.Counter {
-		w.Write([]byte(strconv.FormatInt(*metric.Delta, 10)))
-	} else {
-		s := strconv.FormatFloat(*metric.Value, 'f', 3, 64)
-		s = strings.TrimRight(s, "0")
-		s = strings.TrimRight(s, ".")
-		w.Write([]byte(s))
+	err = getMetric(data.MType, data.ID, gh.metricStorage, w)
+	if err != nil {
+		log.Print(err)
 	}
 }
 
@@ -71,21 +59,43 @@ func (gh *GetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metric, err := gh.metricStorage.Get(metricName)
+	err := getMetric(metricType, metricName, gh.metricStorage, w)
+	if err != nil {
+		log.Print(err)
+	}
+
+}
+
+func getMetric(
+	metricType string,
+	metricName string,
+	metricStorage *repository.MemoryMetricsStorage,
+	w http.ResponseWriter) error {
+
+	metric, err := metricStorage.Get(metricName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
-		return
+		return err
 	}
 
 	w.Header().Add("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
 	if metricType == models.Counter {
-		w.Write([]byte(strconv.FormatInt(*metric.Delta, 10)))
+		_, err = w.Write([]byte(strconv.FormatInt(*metric.Delta, 10)))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return err
+		}
+
 	} else {
 		s := strconv.FormatFloat(*metric.Value, 'f', 3, 64)
 		s = strings.TrimRight(s, "0")
 		s = strings.TrimRight(s, ".")
-		w.Write([]byte(s))
+		_, err = w.Write([]byte(s))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return err
+		}
 	}
-
+	return nil
 }

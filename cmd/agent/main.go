@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -75,6 +77,69 @@ func (rm *RuntimeMetrics) Get() runtime.MemStats {
 }
 
 func sendMetric(client *http.Client, baseURL string, metricType string, metricName string, metricValue string) error {
+	requestURL := fmt.Sprintf("http://%s/update/", baseURL)
+
+	var metric models.Metrics
+
+	if metricType == models.Counter {
+		delta, err := strconv.ParseInt(metricValue, 10, 64)
+		if err != nil {
+			return err
+		}
+
+		var zeroFloat float64 = 0
+		metric = models.Metrics{
+			ID:    metricName,
+			MType: models.Counter,
+			Delta: &delta,
+			Value: &zeroFloat,
+		}
+	} else if metricType == models.Gauge {
+		value, err := strconv.ParseFloat(metricValue, 64)
+		if err != nil {
+			return err
+		}
+
+		var zeroInt64 int64 = 0
+		metric = models.Metrics{
+			ID:    metricName,
+			MType: models.Counter,
+			Delta: &zeroInt64,
+			Value: &value,
+		}
+	} else {
+		return errors.New("wrong type of metric")
+	}
+
+	body, err := json.Marshal(metric)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequest(http.MethodPost, requestURL, nil)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	_, err = request.Body.Read(body)
+	if err != nil {
+		return err
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("[%s] unable to send metric: %s, with value %s", time.Now().Format(time.RFC3339), metricName, metricValue)
+	} else {
+		fmt.Printf("[%s] %s is ok\n", time.Now().Format(time.RFC3339), requestURL)
+	}
+
+	return nil
+}
+
+func sendMetricOLD(client *http.Client, baseURL string, metricType string, metricName string, metricValue string) error {
 	requestURL := fmt.Sprintf("http://%s/update/%s/%s/%s", baseURL, metricType, metricName, metricValue)
 	request, err := http.NewRequest(http.MethodPost, requestURL, nil)
 	if err != nil {
@@ -122,6 +187,7 @@ func (rm *RuntimeMetrics) SendToMetricsStorage(client *http.Client) error {
 			if err != nil {
 				return err
 			}
+
 		}
 	}
 	// send poll counts

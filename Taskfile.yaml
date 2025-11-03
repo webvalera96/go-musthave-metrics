@@ -16,7 +16,6 @@ tasks:
     cmds:
       - go build -o cmd/server/server cmd/server/main.go
 
-
   _buildAgentWindows:
     desc: "Internal: Build agent (windows)"
     internal: true

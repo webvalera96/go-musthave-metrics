@@ -32,7 +32,16 @@ func (ms *MemoryMetricsStorage) Get(k string) (*models.Metrics, error) {
 func (ms *MemoryMetricsStorage) Set(m *models.Metrics) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
+
 	if m.MType == models.Counter && ms.data[m.ID] != nil {
+		if ms.data[m.ID].Delta == nil {
+			return errors.New("corrupted database")
+		}
+
+		if m.Delta == nil {
+			return errors.New("delta cannot be nil")
+		}
+
 		newDelta := *(ms.data[m.ID].Delta) + *(m.Delta)
 		ms.data[m.ID].Delta = &newDelta
 		return nil
