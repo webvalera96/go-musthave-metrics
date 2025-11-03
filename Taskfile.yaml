@@ -84,11 +84,19 @@ tasks:
       - task: _buildServerDarwin
       - task: _buildAgentDarwin
 
+  vet:
+    desc: "go vet"
+    cmds:
+      - go vet ./...
+
   test:
     desc: "Run autotest"
     cmds:
+      - task: vet
       - task: build
       - task: _downloadAutoTestsWindows
       - task: _downloadAutoTestsDarwin
       - task: _runAutoTestsWindows
       - task: _runAutoTestsDarwin
+
+

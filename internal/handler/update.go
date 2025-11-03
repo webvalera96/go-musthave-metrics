@@ -51,7 +51,7 @@ func (uh *UpdateJSONHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if data.MType == models.Counter {
 		if data.Delta == nil {
-			err = errors.New("delta is empty")
+			http.Error(w, "Unable to save metric: (delta is empty)", http.StatusServiceUnavailable)
 		}
 		err = uh.metricStorage.Set(&models.Metrics{
 			ID:    data.ID,
@@ -60,7 +60,7 @@ func (uh *UpdateJSONHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 	} else if data.MType == models.Gauge {
 		if data.Value == nil {
-			err = errors.New("value is empty")
+			http.Error(w, "Unable to save metric: (value is empty)", http.StatusServiceUnavailable)
 		}
 		err = uh.metricStorage.Set(&models.Metrics{
 			ID:    data.ID,
