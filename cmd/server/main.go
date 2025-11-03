@@ -26,7 +26,7 @@ func parseFlags() {
 	var exist bool
 	flagRunAddr, exist = os.LookupEnv(EnvAddress)
 	if !exist {
-		flag.StringVar(&flagRunAddr, "a", "localhost:8080", "address and port to run server")
+		flag.StringVar(&flagRunAddr, "a", ":8080", "address and port to run server")
 		flag.Parse()
 	}
 }
@@ -81,7 +81,12 @@ func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux) *http.Server {
 				return err
 			}
 			fmt.Println("Starting HTTP serve at", srv.Addr)
-			go srv.Serve(ln)
+			go func(ln *net.Listener) {
+				err := srv.Serve(*ln)
+				if err != nil {
+					panic(err)
+				}
+			}(&ln)
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {

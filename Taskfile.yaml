@@ -1,0 +1,50 @@
+version: "3"
+
+tasks:
+  _buildServerWindows:
+    desc: "Internal: Build server (windows)"
+    internal: true
+    platforms: [windows]
+    cmds:
+      - go build -o cmd/server/server.exe cmd/server/main.go
+
+  _buildAgentWindows:
+    desc: "Internal: Build agent (windows)"
+    internal: true
+    platforms: [ windows ]
+    cmds:
+      - go build -o cmd/agent/agent.exe cmd/agent/main.go
+
+  _downloadAutoTestsWindows:
+    desc: "Internal: Download autotest (windows)"
+    internal: true
+    platforms:
+      - windows/amd64
+    cmds:
+      - curl -L -O https://github.com/Yandex-Practicum/go-autotests/releases/download/v0.13.2/metricstest-windows-amd64.exe
+
+  _runAutoTestsServerWindows:
+    desc: "Internal: Run autotest for server (windows)"
+    internal: true
+    platforms:
+      - windows/amd64
+    cmds:
+      - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration1$ -binary-path=cmd/server/server.exe
+      - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration2$ -binary-path=cmd/server/server.exe
+      - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration3$ -binary-path=cmd/server/server.exe
+      - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration4$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=.
+      - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration5$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=.
+      - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration6$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=.
+
+  build:
+    desc: "Build server and agent"
+    cmds:
+      - task: _buildServerWindows
+      - task: _buildAgentWindows
+
+  test:
+    desc: "Run autotest"
+    cmds:
+      - task: build
+      - task: _downloadAutoTestsWindows
+      - task: _runAutoTestsServerWindows
