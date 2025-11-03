@@ -60,12 +60,6 @@ func NewSugaredLogger() *zap.SugaredLogger {
 	if err != nil {
 		panic(err)
 	}
-	defer func(logger *zap.Logger) {
-		err := logger.Sync()
-		if err != nil {
-			panic(err)
-		}
-	}(logger)
 
 	sugar := *logger.Sugar()
 
@@ -81,12 +75,8 @@ func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux) *http.Server {
 				return err
 			}
 			fmt.Println("Starting HTTP serve at", srv.Addr)
-			go func(ln *net.Listener) {
-				err := srv.Serve(*ln)
-				if err != nil {
-					panic(err)
-				}
-			}(&ln)
+			go srv.Serve(ln)
+
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
