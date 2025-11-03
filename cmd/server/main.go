@@ -81,12 +81,7 @@ func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux) *http.Server {
 				return err
 			}
 			fmt.Println("Starting HTTP serve at", srv.Addr)
-			go func() {
-				err := srv.Serve(ln)
-				if err != nil {
-					panic(err)
-				}
-			}()
+			go srv.Serve(ln)
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
