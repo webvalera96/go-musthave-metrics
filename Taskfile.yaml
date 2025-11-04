@@ -61,6 +61,7 @@ tasks:
       - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration5$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=.
       - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration6$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=.
       - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration7$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=.
+      - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration8$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=.
   _runAutoTestsDarwin:
     desc: "Internal: Run auotest (darwin)"
     platforms:
@@ -73,6 +74,7 @@ tasks:
       - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration5$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
       - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration6$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
       - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration7$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration8$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
   _runAutoTestDarwin:
     desc: "Internal: Run autotest"
 

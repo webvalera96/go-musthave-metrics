@@ -59,6 +59,13 @@ func NewChiMux(
 ) *chi.Mux {
 	r := chi.NewRouter()
 
+	r.Get(
+		"/",
+		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "text/html")
+			writer.Write([]byte("<html><body>In which task should i make it ?</body></html>"))
+		}))
+
 	r.Post(
 		"/update/{metricType}/{metricName}/{metricValue}",
 		http.HandlerFunc(log.WithLogging(updateHandler, sugar).ServeHTTP),
@@ -93,7 +100,7 @@ func NewSugaredLogger() *zap.SugaredLogger {
 }
 
 func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux) *http.Server {
-	srv := &http.Server{Addr: flagRunAddr, Handler: mux}
+	srv := &http.Server{Addr: flagRunAddr, Handler: handler.GzipHandle(mux)}
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			ln, err := net.Listen("tcp", srv.Addr)

@@ -16,6 +16,7 @@ import (
 
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/flags"
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
+	"github.com/webvalera96/go-musthave-metrics/internal/zip"
 )
 
 var MemoryMetrics = []string{
@@ -69,7 +70,13 @@ func (rm *RuntimeMetrics) Get() runtime.MemStats {
 	return rm.RuntimeMemoryMetrics
 }
 
-func sendMetric(client *http.Client, baseURL string, metricType string, metricName string, metricValue string) error {
+func sendMetric(
+	client *http.Client,
+	baseURL string,
+	metricType string,
+	metricName string,
+	metricValue string,
+) error {
 	requestURL := fmt.Sprintf("http://%s/update/", baseURL)
 
 	var metric models.Metrics
@@ -105,11 +112,17 @@ func sendMetric(client *http.Client, baseURL string, metricType string, metricNa
 		return err
 	}
 
-	request, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(body))
+	compressedBody, err := zip.Compress(body)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(compressedBody))
 	if err != nil {
 		return err
 	}
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Encoding", "gzip")
 
 	response, err := client.Do(request)
 	if err != nil {
