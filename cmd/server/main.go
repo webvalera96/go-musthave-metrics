@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -81,6 +83,10 @@ func Restore(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage) {
 		OnStart: func(ctx context.Context) error {
 
 			if flags.FlagRestore {
+				if _, err := os.Stat(flags.FlagStoragePath); errors.Is(err, os.ErrNotExist) {
+					return nil
+				}
+
 				err := ms.Load(flags.FlagStoragePath)
 				if err != nil {
 					return err
