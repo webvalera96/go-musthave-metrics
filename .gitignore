@@ -25,3 +25,5 @@ vendor/
 .vscode
 
 metricstest*
+
+data.db

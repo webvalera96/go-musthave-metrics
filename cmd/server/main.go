@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/webvalera96/go-musthave-metrics/internal/flags"
@@ -30,7 +31,10 @@ func main() {
 			handler.NewGetJSONHandler,
 			handler.NewUpdateJSONHandler,
 		),
-		fx.Invoke(func(*http.Server) {}),
+		fx.Invoke(
+			Restore,
+			func(*http.Server) {},
+		),
 	).Run()
 }
 
@@ -45,31 +49,50 @@ func NewChiMux(
 
 	r.Get(
 		"/",
-		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		func(writer http.ResponseWriter, request *http.Request) {
 			writer.Header().Set("Content-Type", "text/html")
 			writer.Write([]byte("<html><body>In which task should i make it ?</body></html>"))
-		}))
+		})
 
 	r.Post(
 		"/update/{metricType}/{metricName}/{metricValue}",
-		http.HandlerFunc(log.WithLogging(updateHandler, sugar).ServeHTTP),
+		log.WithLogging(updateHandler, sugar).ServeHTTP,
 	)
 
 	r.Get(
 		"/value/{metricType}/{metricName}",
-		http.HandlerFunc(log.WithLogging(getHandler, sugar).ServeHTTP),
+		log.WithLogging(getHandler, sugar).ServeHTTP,
 	)
 
 	r.Post(
 		"/update/",
-		http.HandlerFunc(log.WithLogging(updateJSONHandler, sugar).ServeHTTP),
+		log.WithLogging(updateJSONHandler, sugar).ServeHTTP,
 	)
 
 	r.Post("/value/",
-		http.HandlerFunc(log.WithLogging(getJSONHandler, sugar).ServeHTTP),
+		log.WithLogging(getJSONHandler, sugar).ServeHTTP,
 	)
 
 	return r
+}
+
+func Restore(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+
+			if flags.FlagRestore {
+				err := ms.Load(flags.FlagStoragePath)
+				if err != nil {
+					return err
+				}
+			}
+
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			return nil
+		},
+	})
 }
 
 func NewSugaredLogger() *zap.SugaredLogger {
@@ -83,7 +106,7 @@ func NewSugaredLogger() *zap.SugaredLogger {
 	return &sugar
 }
 
-func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux) *http.Server {
+func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux, ms *repository.MemoryMetricsStorage) *http.Server {
 	srv := &http.Server{Addr: flags.FlagRunAddr, Handler: handler.GzipHandle(mux)}
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
@@ -93,6 +116,9 @@ func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux) *http.Server {
 			}
 			fmt.Println("Starting HTTP serve at", srv.Addr)
 			go srv.Serve(ln)
+
+			duration := time.Duration(flags.FlagStoreInterval)
+			go ms.Reconcile(duration, flags.FlagStoragePath)
 
 			return nil
 		},

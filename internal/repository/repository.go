@@ -2,8 +2,11 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
 	"sync"
+	"time"
 
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
 	"go.uber.org/fx"
@@ -11,11 +14,72 @@ import (
 
 type MemoryMetricsStorage struct {
 	mu   sync.Mutex
-	data map[string](*models.Metrics)
+	data map[string]*models.Metrics
+}
+
+func (ms *MemoryMetricsStorage) Lock() {
+	ms.mu.Lock()
+}
+
+func (ms *MemoryMetricsStorage) Unlock() {
+	ms.mu.Unlock()
+}
+
+func (ms *MemoryMetricsStorage) Reconcile(duration time.Duration, fileStoragePath string) {
+	for {
+		time.Sleep(duration * time.Second)
+		err := ms.Save(fileStoragePath)
+		if err != nil {
+			panic("unable to save")
+		}
+	}
+}
+
+func (ms *MemoryMetricsStorage) Load(fileStoragePath string) error {
+	ms.Lock()
+	defer ms.Unlock()
+
+	var metrics []models.Metrics
+
+	data, err := os.ReadFile(fileStoragePath)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(data, &metrics)
+	if err != nil {
+		return err
+	}
+
+	ms.Make()
+
+	for _, metric := range metrics {
+		ms.data[metric.ID] = &metric
+	}
+
+	return nil
+}
+
+func (ms *MemoryMetricsStorage) Save(fileStoragePath string) error {
+	ms.Lock()
+	defer ms.Unlock()
+
+	var metrics []models.Metrics
+
+	for _, metric := range ms.data {
+		metrics = append(metrics, *metric)
+	}
+
+	data, err := json.MarshalIndent(metrics, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(fileStoragePath, data, 0666)
 }
 
 func (ms *MemoryMetricsStorage) Make() {
-	ms.data = make(map[string](*models.Metrics))
+	ms.data = make(map[string]*models.Metrics)
 }
 
 func (ms *MemoryMetricsStorage) Get(k string) (*models.Metrics, error) {
