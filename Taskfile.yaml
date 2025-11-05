@@ -68,14 +68,14 @@ tasks:
     platforms:
       - darwin
     cmds:
-#      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration1$ -binary-path=cmd/server/server
-#      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration2$ -binary-path=cmd/server/server
-#      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration3$ -binary-path=cmd/server/server
-#      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration4$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
-#      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration5$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
-#      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration6$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
-#      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration7$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
-#      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration8$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration1$ -binary-path=cmd/server/server
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration2$ -binary-path=cmd/server/server
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration3$ -binary-path=cmd/server/server
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration4$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration5$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration6$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration7$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
+      - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration8$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
       - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration9$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=. -file-storage-path=data.db
   _runAutoTestDarwin:
     desc: "Internal: Run autotest"
