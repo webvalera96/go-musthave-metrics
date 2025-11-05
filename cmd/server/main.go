@@ -2,13 +2,12 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/webvalera96/go-musthave-metrics/internal/flags"
 	"github.com/webvalera96/go-musthave-metrics/internal/handler"
 	"github.com/webvalera96/go-musthave-metrics/internal/handler/log"
 	"github.com/webvalera96/go-musthave-metrics/internal/repository"
@@ -16,24 +15,9 @@ import (
 	"go.uber.org/zap"
 )
 
-var flagRunAddr string
-
-const (
-	EnvAddress = "ADDRESS"
-)
-
-func parseFlags() {
-	var exist bool
-	flagRunAddr, exist = os.LookupEnv(EnvAddress)
-	if !exist {
-		flag.StringVar(&flagRunAddr, "a", ":8080", "address and port to run server")
-		flag.Parse()
-	}
-}
-
 func main() {
 
-	parseFlags()
+	flags.ParseFlags()
 
 	fx.New(
 		fx.Provide(
@@ -100,7 +84,7 @@ func NewSugaredLogger() *zap.SugaredLogger {
 }
 
 func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux) *http.Server {
-	srv := &http.Server{Addr: flagRunAddr, Handler: handler.GzipHandle(mux)}
+	srv := &http.Server{Addr: flags.FlagRunAddr, Handler: handler.GzipHandle(mux)}
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			ln, err := net.Listen("tcp", srv.Addr)
