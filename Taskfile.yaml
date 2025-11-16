@@ -103,4 +103,9 @@ tasks:
       - task: _runAutoTestsWindows
       - task: _runAutoTestsDarwin
 
+  compose:
+    desc: "Run docker compose"
+    cmds:
+      - docker compose up -d
+
 

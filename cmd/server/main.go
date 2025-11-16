@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/webvalera96/go-musthave-metrics/internal/flags"
 	"github.com/webvalera96/go-musthave-metrics/internal/handler"
 	"github.com/webvalera96/go-musthave-metrics/internal/handler/log"
@@ -28,10 +30,12 @@ func main() {
 			NewHTTPServer,
 			NewSugaredLogger,
 			NewChiMux,
+			NewDatabase,
 			handler.NewGetHandler,
 			handler.NewUpdateHandler,
 			handler.NewGetJSONHandler,
 			handler.NewUpdateJSONHandler,
+			handler.NewPingHandler,
 		),
 		fx.Invoke(
 			Restore,
@@ -46,6 +50,7 @@ func NewChiMux(
 	updateJSONHandler *handler.UpdateJSONHandler,
 	getJSONHandler *handler.GetJSONHandler,
 	sugar *zap.SugaredLogger,
+	pingHandler *handler.PingHandler,
 ) *chi.Mux {
 	r := chi.NewRouter()
 
@@ -75,6 +80,11 @@ func NewChiMux(
 		log.WithLogging(getJSONHandler, sugar).ServeHTTP,
 	)
 
+	r.Get(
+		"/ping",
+		log.WithLogging(pingHandler, sugar).ServeHTTP,
+	)
+
 	return r
 }
 
@@ -99,6 +109,14 @@ func Restore(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage) {
 			return nil
 		},
 	})
+}
+
+func NewDatabase(lc fx.Lifecycle) *sql.DB {
+	db, err := sql.Open("postgres", "host=localhost port=5432 user=postgres password=postgres dbname=praktikum sslmode=disable")
+	if err != nil {
+		panic(err)
+	}
+	return db
 }
 
 func NewSugaredLogger() *zap.SugaredLogger {
