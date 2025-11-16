@@ -112,7 +112,8 @@ func Restore(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage) {
 }
 
 func NewDatabase(lc fx.Lifecycle) *sql.DB {
-	db, err := sql.Open("postgres", "host=localhost port=5432 user=postgres password=postgres dbname=praktikum sslmode=disable")
+
+	db, err := sql.Open("postgres", flags.FlagDatabaseDSN)
 	if err != nil {
 		panic(err)
 	}

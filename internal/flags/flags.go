@@ -12,12 +12,14 @@ const (
 	EnvStoreInterval   = "STORE_INTERVAL"
 	EnvFileStoragePath = "FILE_STORAGE_PATH"
 	EnvRestore         = "RESTORE"
+	EnvDatabaseDSN     = "DATABASE_DSN"
 )
 
 var FlagRunAddr string
 var FlagStoreInterval int
 var FlagStoragePath string
 var FlagRestore bool
+var FlagDatabaseDSN string
 
 func ParseFlags() {
 	var exist bool
@@ -63,6 +65,14 @@ func ParseFlags() {
 		}
 	} else {
 		flag.BoolVar(&FlagRestore, "r", false, "restore from file")
+	}
+
+	var databaseDSN string
+	databaseDSN, exist = os.LookupEnv(EnvDatabaseDSN)
+	if exist {
+		FlagDatabaseDSN = databaseDSN
+	} else {
+		flag.StringVar(&FlagDatabaseDSN, "d", "host=localhost port=5432 user=postgres password=postgres dbname=praktikum sslmode=disable", "database DSN")
 	}
 
 	flag.Parse()
