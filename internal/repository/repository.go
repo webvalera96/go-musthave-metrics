@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"os"
@@ -15,6 +16,7 @@ import (
 type MemoryMetricsStorage struct {
 	mu   sync.Mutex
 	data map[string]*models.Metrics
+	db   *sql.DB
 }
 
 func (ms *MemoryMetricsStorage) Lock() {

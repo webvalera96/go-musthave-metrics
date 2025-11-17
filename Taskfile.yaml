@@ -107,9 +107,17 @@ tasks:
       - task: _runAutoTestsWindows
       - task: _runAutoTestsDarwin
 
-  compose:
-    desc: "Run docker compose"
+  db:
+    desc: "Run db in docker"
     cmds:
-      - docker compose up -d
+      - docker compose -f db-compose.yml up -d 
+
+  migrate:
+    desc: "Run migrations"
+    cmds:
+      - task: db
+      - migrate -path ./migrations -database postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable down
+      - migrate -path ./migrations -database postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable up
+      
 
 
