@@ -149,7 +149,7 @@ func NewDatabase() *sql.DB {
 			panic(err)
 		}
 		err = m.Migrate(1) // or m.Steps(2) if you want to explicitly set the number of migrations to run
-		if err != nil && !errors.Is(migrate.ErrNoChange, err) {
+		if err != nil && !errors.Is(err, migrate.ErrNoChange) {
 			panic(err)
 		}
 		return db
