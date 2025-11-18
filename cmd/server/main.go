@@ -11,6 +11,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq" // PostgresSQL driver
 	"github.com/webvalera96/go-musthave-metrics/internal/flags"
 	"github.com/webvalera96/go-musthave-metrics/internal/handler"
@@ -128,6 +131,19 @@ func Restore(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage, db *sql.DB) {
 func NewDatabase() *sql.DB {
 
 	db, err := sql.Open("postgres", flags.FlagDatabaseDSN)
+	if err != nil {
+		panic(err)
+	}
+
+	// Создадим необходимые таблицы в базе данных
+	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	m, err := migrate.NewWithDatabaseInstance(
+		"file:///migrations",
+		"postgres", driver)
+	if err != nil {
+		panic(err)
+	}
+	err = m.Up() // or m.Steps(2) if you want to explicitly set the number of migrations to run
 	if err != nil {
 		panic(err)
 	}
