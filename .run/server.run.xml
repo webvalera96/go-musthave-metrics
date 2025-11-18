@@ -2,6 +2,10 @@
   <configuration default="false" name="server" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="go-musthave-metrics" />
     <working_directory value="$PROJECT_DIR$" />
+    <envs>
+      <env name="DATABASE_DSN" value="host=localhost port=5432 user=postgres password=postgres dbname=praktikum sslmode=disable" />
+      <env name="FILE_STORAGE_PATH" value="" />
+    </envs>
     <kind value="PACKAGE" />
     <package value="github.com/webvalera96/go-musthave-metrics/cmd/server" />
     <directory value="$PROJECT_DIR$" />

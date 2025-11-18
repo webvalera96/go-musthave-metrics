@@ -36,13 +36,13 @@ func (ms *MemoryMetricsStorage) Reconcile(duration time.Duration, fileStoragePat
 	}
 }
 
-func (ms *MemoryMetricsStorage) ReconcileDB(ctx context.Context, duration time.Duration,
-	db *sql.DB) {
+func (ms *MemoryMetricsStorage) ReconcileDB(duration time.Duration,
+	db *sql.DB, timeout time.Duration) {
 	for {
-		time.Sleep(duration * time.Second)
-		err := ms.SaveDB(ctx, db)
+
+		err := ms.SaveDB(db, timeout)
 		if err != nil {
-			panic("unable to save in database")
+			panic(err)
 		}
 	}
 }
@@ -72,11 +72,11 @@ func (ms *MemoryMetricsStorage) Load(fileStoragePath string) error {
 	return nil
 }
 
-func (ms *MemoryMetricsStorage) LoadDB(ctx context.Context, db *sql.DB) error {
+func (ms *MemoryMetricsStorage) LoadDB(db *sql.DB, timeout time.Duration) error {
 	ms.Lock()
 	defer ms.Unlock()
 
-	metrics, err := models.ReadDB(ctx, db)
+	metrics, err := models.ReadDB(db, timeout)
 	if err != nil {
 		return err
 	}
@@ -90,12 +90,12 @@ func (ms *MemoryMetricsStorage) LoadDB(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-func (ms *MemoryMetricsStorage) SaveDB(ctx context.Context, db *sql.DB) error {
+func (ms *MemoryMetricsStorage) SaveDB(db *sql.DB, timeout time.Duration) error {
 	ms.Lock()
 	defer ms.Unlock()
 
 	for _, metric := range ms.data {
-		_, err := metric.SaveDB(ctx, db)
+		_, err := metric.SaveDB(db, timeout)
 		if err != nil {
 			return err
 		}

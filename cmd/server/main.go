@@ -23,6 +23,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const timeout time.Duration = time.Duration(30)
+
 func main() {
 
 	flags.ParseFlags()
@@ -108,7 +110,7 @@ func Restore(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage, db *sql.DB) {
 						return err
 					}
 				} else if flags.FlagDatabaseDSN != "" {
-					err := ms.LoadDB(ctx, db)
+					err := ms.LoadDB(db, timeout)
 					if err != nil {
 						return err
 					}
@@ -141,13 +143,13 @@ func NewDatabase() *sql.DB {
 			panic(err)
 		}
 		m, err := migrate.NewWithDatabaseInstance(
-			"file:///migrations",
+			"file://migrations",
 			"postgres", driver)
 		if err != nil {
 			panic(err)
 		}
-		err = m.Up() // or m.Steps(2) if you want to explicitly set the number of migrations to run
-		if err != nil {
+		err = m.Migrate(1) // or m.Steps(2) if you want to explicitly set the number of migrations to run
+		if err != nil && !errors.Is(migrate.ErrNoChange, err) {
 			panic(err)
 		}
 		return db
@@ -179,11 +181,15 @@ func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux, ms *repository.MemoryMetricsSt
 			fmt.Println("Starting HTTP serve at", srv.Addr)
 			go srv.Serve(ln)
 
+			if flags.FlagStoragePath != "" && flags.FlagDatabaseDSN != "" {
+				flags.FlagStoragePath = ""
+			}
+
 			duration := time.Duration(flags.FlagStoreInterval)
 			if flags.FlagStoragePath != "" {
 				go ms.Reconcile(duration, flags.FlagStoragePath)
 			} else if flags.FlagDatabaseDSN != "" {
-				go ms.ReconcileDB(ctx, duration, db)
+				go ms.ReconcileDB(duration, db, timeout)
 			}
 
 			return nil

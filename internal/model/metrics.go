@@ -25,12 +25,11 @@ type Metrics struct {
 	Hash  string   `json:"hash,omitempty"`
 }
 
-func ReadDB(pCtx context.Context, db *sql.DB) ([]Metrics, error) {
-	ctx, cancel := context.WithTimeout(pCtx, 10*time.Second)
-	defer cancel()
+func ReadDB(db *sql.DB, timeout time.Duration) ([]Metrics, error) {
 
 	var metrics []Metrics
-
+	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)
+	defer cancel()
 	query := "SELECT * FROM metrics"
 	rows, err := db.QueryContext(ctx, query)
 
@@ -54,19 +53,22 @@ func ReadDB(pCtx context.Context, db *sql.DB) ([]Metrics, error) {
 	return metrics, nil
 }
 
-func (m Metrics) SaveDB(pCtx context.Context, db *sql.DB) (string, error) {
+func (m Metrics) SaveDB(db *sql.DB, timeout time.Duration) (string, error) {
 	// Проверяем, есть ли в базе данных такая запись
-	ctx, cancel := context.WithTimeout(pCtx, 10*time.Second)
-	defer cancel()
 
-	query := fmt.Sprintf("EXISTS(SELECT * FROM metrics WHERE id == %s)", m.ID)
+	query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM metrics WHERE id = '%s')", m.ID)
 	exists := false
-
+	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)
+	defer cancel()
 	err := db.QueryRowContext(ctx, query).Scan(&exists)
 	if err != nil {
+		return "", err
+	}
+
+	if !exists {
 
 		// Запись не существует, тогда добавляем запись в базу данных
-		query = fmt.Sprintf("INSERT INTO metrics (id, type, delta, value, hash) VALUES (%s, %s, %d, %d, %s)", m.ID, m.MType, m.Delta, m.Value, m.Hash)
+		query = fmt.Sprintf("INSERT INTO metrics (id, type, delta, value, hash) VALUES ('%s', '%s', %d, %d, '%s')", m.ID, m.MType, m.Delta, m.Value, m.Hash)
 
 		_, err := db.ExecContext(ctx, query)
 		if err != nil {
@@ -75,7 +77,7 @@ func (m Metrics) SaveDB(pCtx context.Context, db *sql.DB) (string, error) {
 
 	} else {
 		// Запись существует, тогда ее надо обновить
-		query = fmt.Sprintf("UPDATE metrics SET id = %s, type = %s, delta = %d, value = %d, hash = %s", m.ID, m.MType, m.Delta, m.Value, m.Hash)
+		query = fmt.Sprintf("UPDATE metrics SET type = '%s', delta = %d, value = %d, hash = '%s' WHERE id = '%s'", m.MType, m.Delta, m.Value, m.Hash, m.ID)
 		_, err := db.ExecContext(ctx, query)
 		if err != nil {
 			return "", err

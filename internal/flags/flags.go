@@ -72,7 +72,7 @@ func ParseFlags() {
 	if exist {
 		FlagDatabaseDSN = databaseDSN
 	} else {
-		flag.StringVar(&FlagDatabaseDSN, "d", "host=localhost port=5432 user=postgres password=postgres dbname=praktikum sslmode=disable", "database DSN")
+		flag.StringVar(&FlagDatabaseDSN, "d", "", "database DSN")
 	}
 
 	flag.Parse()
