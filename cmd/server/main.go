@@ -129,28 +129,32 @@ func Restore(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage, db *sql.DB) {
 }
 
 func NewDatabase() *sql.DB {
+	if flags.FlagDatabaseDSN != "" {
+		db, err := sql.Open("postgres", flags.FlagDatabaseDSN)
+		if err != nil {
+			panic(err)
+		}
 
-	db, err := sql.Open("postgres", flags.FlagDatabaseDSN)
-	if err != nil {
-		panic(err)
+		// Создадим необходимые таблицы в базе данных
+		driver, err := postgres.WithInstance(db, &postgres.Config{})
+		if err != nil {
+			panic(err)
+		}
+		m, err := migrate.NewWithDatabaseInstance(
+			"file:///migrations",
+			"postgres", driver)
+		if err != nil {
+			panic(err)
+		}
+		err = m.Up() // or m.Steps(2) if you want to explicitly set the number of migrations to run
+		if err != nil {
+			panic(err)
+		}
+		return db
 	}
 
-	// Создадим необходимые таблицы в базе данных
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
-	if err != nil {
-		panic(err)
-	}
-	m, err := migrate.NewWithDatabaseInstance(
-		"file:///migrations",
-		"postgres", driver)
-	if err != nil {
-		panic(err)
-	}
-	err = m.Up() // or m.Steps(2) if you want to explicitly set the number of migrations to run
-	if err != nil {
-		panic(err)
-	}
-	return db
+	return nil
+
 }
 
 func NewSugaredLogger() *zap.SugaredLogger {
