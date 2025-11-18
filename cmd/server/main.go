@@ -137,6 +137,9 @@ func NewDatabase() *sql.DB {
 
 	// Создадим необходимые таблицы в базе данных
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		panic(err)
+	}
 	m, err := migrate.NewWithDatabaseInstance(
 		"file:///migrations",
 		"postgres", driver)

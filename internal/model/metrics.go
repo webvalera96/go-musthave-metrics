@@ -31,7 +31,7 @@ func ReadDB(pCtx context.Context, db *sql.DB) ([]Metrics, error) {
 
 	var metrics []Metrics
 
-	query := fmt.Sprintf("SELECT * FROM metrics")
+	query := "SELECT * FROM metrics"
 	rows, err := db.QueryContext(ctx, query)
 
 	if err != nil {
