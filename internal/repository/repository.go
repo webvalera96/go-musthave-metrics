@@ -16,7 +16,6 @@ import (
 type MemoryMetricsStorage struct {
 	mu   sync.Mutex
 	data map[string]*models.Metrics
-	db   *sql.DB
 }
 
 func (ms *MemoryMetricsStorage) Lock() {
@@ -33,6 +32,17 @@ func (ms *MemoryMetricsStorage) Reconcile(duration time.Duration, fileStoragePat
 		err := ms.Save(fileStoragePath)
 		if err != nil {
 			panic("unable to save")
+		}
+	}
+}
+
+func (ms *MemoryMetricsStorage) ReconcileDB(ctx context.Context, duration time.Duration,
+	db *sql.DB) {
+	for {
+		time.Sleep(duration * time.Second)
+		err := ms.SaveDB(ctx, db)
+		if err != nil {
+			panic("unable to save in database")
 		}
 	}
 }
@@ -57,6 +67,38 @@ func (ms *MemoryMetricsStorage) Load(fileStoragePath string) error {
 
 	for _, metric := range metrics {
 		ms.data[metric.ID] = &metric
+	}
+
+	return nil
+}
+
+func (ms *MemoryMetricsStorage) LoadDB(ctx context.Context, db *sql.DB) error {
+	ms.Lock()
+	defer ms.Unlock()
+
+	metrics, err := models.ReadDB(ctx, db)
+	if err != nil {
+		return err
+	}
+
+	ms.Make()
+
+	for _, metric := range metrics {
+		ms.data[metric.ID] = &metric
+	}
+
+	return nil
+}
+
+func (ms *MemoryMetricsStorage) SaveDB(ctx context.Context, db *sql.DB) error {
+	ms.Lock()
+	defer ms.Unlock()
+
+	for _, metric := range ms.data {
+		_, err := metric.SaveDB(ctx, db)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
