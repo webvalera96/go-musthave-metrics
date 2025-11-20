@@ -56,6 +56,8 @@ func ParseFlags() {
 	var restore string
 	restore, exist = os.LookupEnv(EnvRestore)
 
+	flag.BoolVar(&FlagRestore, "r", false, "restore from file or database")
+
 	if exist {
 		var err error
 		FlagRestore, err = strconv.ParseBool(restore)
