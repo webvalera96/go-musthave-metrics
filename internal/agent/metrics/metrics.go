@@ -16,6 +16,7 @@ import (
 
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/flags"
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
+	"github.com/webvalera96/go-musthave-metrics/internal/retry"
 	"github.com/webvalera96/go-musthave-metrics/internal/zip"
 )
 
@@ -155,25 +156,29 @@ func sendMetricsBatch(
 		return err
 	}
 
-	request, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(compressedBody))
-	if err != nil {
-		return err
-	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Content-Encoding", "gzip")
+	// Используем retry логику для обработки временных ошибок соединения
+	err = retry.Retry(func() error {
+		request, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(compressedBody))
+		if err != nil {
+			return err
+		}
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Content-Encoding", "gzip")
 
-	response, err := client.Do(request)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("[%s] unable to send metrics batch, status: %d", time.Now().Format(time.RFC3339), response.StatusCode)
-	} else {
+		response, err := client.Do(request)
+		if err != nil {
+			return err
+		}
+		defer response.Body.Close()
+		if response.StatusCode != http.StatusOK {
+			// Не retriable ошибка - не повторяем
+			return fmt.Errorf("[%s] unable to send metrics batch, status: %d", time.Now().Format(time.RFC3339), response.StatusCode)
+		}
 		fmt.Printf("[%s] %s is ok (sent %d metrics)\n", time.Now().Format(time.RFC3339), requestURL, len(metrics))
-	}
+		return nil
+	})
 
-	return nil
+	return err
 }
 
 func (rm *RuntimeMetrics) SendToMetricsStorage(client *http.Client) error {

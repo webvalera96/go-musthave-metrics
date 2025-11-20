@@ -3,6 +3,8 @@ package handler
 import (
 	"database/sql"
 	"net/http"
+
+	"github.com/webvalera96/go-musthave-metrics/internal/retry"
 )
 
 type PingHandler struct {
@@ -20,7 +22,11 @@ func (h *PingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	if err := h.db.PingContext(ctx); err != nil {
+	err := retry.Retry(func() error {
+		return h.db.PingContext(ctx)
+	})
+
+	if err != nil {
 		http.Error(w, "Database connection failed", http.StatusInternalServerError)
 		return
 	}
