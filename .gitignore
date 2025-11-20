@@ -27,3 +27,6 @@ vendor/
 metricstest*
 
 data.db
+
+server
+agent

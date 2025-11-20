@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -113,10 +112,6 @@ func Restore(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage, db *sql.DB) {
 						return err
 					}
 				} else if flags.FlagStoragePath != "" {
-					if _, err := os.Stat(flags.FlagStoragePath); errors.Is(err, os.ErrNotExist) {
-						return nil
-					}
-
 					err := ms.Load(flags.FlagStoragePath)
 					if err != nil {
 						return err

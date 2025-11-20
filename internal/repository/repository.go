@@ -51,6 +51,14 @@ func (ms *MemoryMetricsStorage) Load(fileStoragePath string) error {
 	ms.Lock()
 	defer ms.Unlock()
 
+	// Проверяем существование файла
+	if _, err := os.Stat(fileStoragePath); errors.Is(err, os.ErrNotExist) {
+		// Файл не существует - это нормальная ситуация при первом запуске
+		// Инициализируем пустое хранилище
+		ms.Make()
+		return nil
+	}
+
 	var metrics []models.Metrics
 
 	data, err := os.ReadFile(fileStoragePath)
