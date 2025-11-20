@@ -138,8 +138,48 @@ func sendMetric(
 	return nil
 }
 
+func sendMetricsBatch(
+	client *http.Client,
+	baseURL string,
+	metrics []models.Metrics,
+) error {
+	requestURL := fmt.Sprintf("http://%s/updates/", baseURL)
+
+	body, err := json.Marshal(metrics)
+	if err != nil {
+		return err
+	}
+
+	compressedBody, err := zip.Compress(body)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(compressedBody))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Encoding", "gzip")
+
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("[%s] unable to send metrics batch, status: %d", time.Now().Format(time.RFC3339), response.StatusCode)
+	} else {
+		fmt.Printf("[%s] %s is ok (sent %d metrics)\n", time.Now().Format(time.RFC3339), requestURL, len(metrics))
+	}
+
+	return nil
+}
+
 func (rm *RuntimeMetrics) SendToMetricsStorage(client *http.Client) error {
-	// send memory metrics
+	var metricsBatch []models.Metrics
+
+	// collect memory metrics
 	value := reflect.ValueOf(rm.RuntimeMemoryMetrics)
 	typ := value.Type()
 	for i := 0; i < value.NumField(); i++ {
@@ -160,26 +200,32 @@ func (rm *RuntimeMetrics) SendToMetricsStorage(client *http.Client) error {
 				continue
 			}
 
-			// send gauge metrics of agent mem stats
-			err := sendMetric(client, flags.FlagMetricsServer, models.Gauge, metricName, strconv.FormatFloat(metricValue, 'f', 3, 64))
-			if err != nil {
-				return err
-			}
-
+			// add gauge metric to batch
+			metricsBatch = append(metricsBatch, models.Metrics{
+				ID:    metricName,
+				MType: models.Gauge,
+				Value: &metricValue,
+			})
 		}
 	}
-	// send poll counts
-	err := sendMetric(client, flags.FlagMetricsServer, models.Counter, "PollCount", strconv.FormatUint(rm.PollCount, 10))
-	if err != nil {
-		return err
-	}
 
-	// send random value
-	err = sendMetric(client, flags.FlagMetricsServer, models.Gauge, "RandomValue", strconv.FormatFloat(rm.RandomValue, 'f', 3, 64))
-	if err != nil {
-		return err
-	}
-	return nil
+	// add poll count to batch
+	pollCountDelta := int64(rm.PollCount)
+	metricsBatch = append(metricsBatch, models.Metrics{
+		ID:    "PollCount",
+		MType: models.Counter,
+		Delta: &pollCountDelta,
+	})
+
+	// add random value to batch
+	metricsBatch = append(metricsBatch, models.Metrics{
+		ID:    "RandomValue",
+		MType: models.Gauge,
+		Value: &rm.RandomValue,
+	})
+
+	// send all metrics in one batch
+	return sendMetricsBatch(client, flags.FlagMetricsServer, metricsBatch)
 }
 
 //func sendMetric(client *http.Client, baseURL string, metricType string, metricName string, metricValue string) error {
