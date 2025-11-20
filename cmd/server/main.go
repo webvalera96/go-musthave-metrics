@@ -40,6 +40,7 @@ func main() {
 			handler.NewUpdateHandler,
 			handler.NewGetJSONHandler,
 			handler.NewUpdateJSONHandler,
+			handler.NewUpdateBatchHandler,
 			handler.NewPingHandler,
 		),
 		fx.Invoke(
@@ -54,6 +55,7 @@ func NewChiMux(
 	getHandler *handler.GetHandler,
 	updateJSONHandler *handler.UpdateJSONHandler,
 	getJSONHandler *handler.GetJSONHandler,
+	updateBatchHandler *handler.UpdateBatchHandler,
 	sugar *zap.SugaredLogger,
 	pingHandler *handler.PingHandler,
 ) *chi.Mux {
@@ -80,6 +82,11 @@ func NewChiMux(
 	r.Post(
 		"/update/",
 		log.WithLogging(updateJSONHandler, sugar).ServeHTTP,
+	)
+
+	r.Post(
+		"/updates/",
+		log.WithLogging(updateBatchHandler, sugar).ServeHTTP,
 	)
 
 	r.Post("/value/",

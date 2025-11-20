@@ -28,12 +28,20 @@ type UpdateJSONHandler struct {
 	metricStorage *repository.MemoryMetricsStorage
 }
 
+type UpdateBatchHandler struct {
+	metricStorage *repository.MemoryMetricsStorage
+}
+
 func NewUpdateHandler(ms *repository.MemoryMetricsStorage) *UpdateHandler {
 
 	return &UpdateHandler{metricStorage: ms}
 }
 func NewUpdateJSONHandler(ms *repository.MemoryMetricsStorage) *UpdateJSONHandler {
 	return &UpdateJSONHandler{metricStorage: ms}
+}
+
+func NewUpdateBatchHandler(ms *repository.MemoryMetricsStorage) *UpdateBatchHandler {
+	return &UpdateBatchHandler{metricStorage: ms}
 }
 
 func (uh *UpdateJSONHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -163,4 +171,55 @@ func updateMetric(
 	w.WriteHeader(http.StatusOK)
 	w.Write(nil)
 	return nil
+}
+
+func (uh *UpdateBatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "wrong content type", http.StatusBadRequest)
+		return
+	}
+
+	var metrics []models.Metrics
+
+	err := json.NewDecoder(r.Body).Decode(&metrics)
+	if err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	for _, data := range metrics {
+		if data.MType == models.Counter {
+			if data.Delta == nil {
+				http.Error(w, fmt.Sprintf("Unable to save metric %s: (delta is empty)", data.ID), http.StatusBadRequest)
+				return
+			}
+			err = uh.metricStorage.Set(&models.Metrics{
+				ID:    data.ID,
+				MType: data.MType,
+				Delta: data.Delta,
+			})
+		} else if data.MType == models.Gauge {
+			if data.Value == nil {
+				http.Error(w, fmt.Sprintf("Unable to save metric %s: (value is empty)", data.ID), http.StatusBadRequest)
+				return
+			}
+			err = uh.metricStorage.Set(&models.Metrics{
+				ID:    data.ID,
+				MType: data.MType,
+				Value: data.Value,
+			})
+		} else {
+			http.Error(w, fmt.Sprintf("Unknown type of metric: %s for metric %s", data.MType, data.ID), http.StatusBadRequest)
+			return
+		}
+
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Unable to save metric %s: (%s)", data.ID, err), http.StatusServiceUnavailable)
+			return
+		}
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(nil)
 }
