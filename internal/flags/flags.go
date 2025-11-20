@@ -51,7 +51,7 @@ func ParseFlags() {
 	if exist {
 		FlagStoragePath = fileStoragePath
 	} else {
-		flag.StringVar(&FlagStoragePath, "f", "data.db", "path to saved data in file")
+		flag.StringVar(&FlagStoragePath, "f", "", "path to saved data in file")
 	}
 
 	var restore string

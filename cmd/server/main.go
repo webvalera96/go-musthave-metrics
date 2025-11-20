@@ -106,8 +106,13 @@ func Restore(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage, db *sql.DB) {
 		OnStart: func(ctx context.Context) error {
 
 			if flags.FlagRestore {
-
-				if flags.FlagStoragePath != "" {
+				// Приоритет: DATABASE_DSN > FILE_STORAGE_PATH > память
+				if flags.FlagDatabaseDSN != "" {
+					err := ms.LoadDB(db, timeout)
+					if err != nil {
+						return err
+					}
+				} else if flags.FlagStoragePath != "" {
 					if _, err := os.Stat(flags.FlagStoragePath); errors.Is(err, os.ErrNotExist) {
 						return nil
 					}
@@ -116,21 +121,18 @@ func Restore(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage, db *sql.DB) {
 					if err != nil {
 						return err
 					}
-				} else if flags.FlagDatabaseDSN != "" {
-					err := ms.LoadDB(db, timeout)
-					if err != nil {
-						return err
-					}
 				}
-
+				// Если оба пустые - используем память, ничего не загружаем
 			}
 
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			err := db.Close()
-			if err != nil {
-				return err
+			if db != nil {
+				err := db.Close()
+				if err != nil {
+					return err
+				}
 			}
 			return nil
 		},
@@ -188,16 +190,16 @@ func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux, ms *repository.MemoryMetricsSt
 			fmt.Println("Starting HTTP serve at", srv.Addr)
 			go srv.Serve(ln)
 
-			if flags.FlagStoragePath != "" && flags.FlagDatabaseDSN != "" {
-				flags.FlagStoragePath = ""
-			}
-
+			// Приоритет: DATABASE_DSN > FILE_STORAGE_PATH > память
 			duration := time.Duration(flags.FlagStoreInterval)
-			if flags.FlagStoragePath != "" {
-				go ms.Reconcile(duration, flags.FlagStoragePath)
-			} else if flags.FlagDatabaseDSN != "" {
+			if flags.FlagDatabaseDSN != "" {
+				// Используем БД
 				go ms.ReconcileDB(duration, db, timeout)
+			} else if flags.FlagStoragePath != "" {
+				// Используем файл
+				go ms.Reconcile(duration, flags.FlagStoragePath)
 			}
+			// Если оба пустые - используем память, периодическое сохранение не запускаем
 
 			return nil
 		},
