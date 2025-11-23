@@ -134,44 +134,46 @@ func Restore(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage, db *sql.DB) {
 	})
 }
 
-func NewDatabase() *sql.DB {
+func NewDatabase() (*sql.DB, error) {
 	if flags.FlagDatabaseDSN != "" {
 		db, err := sql.Open("postgres", flags.FlagDatabaseDSN)
 		if err != nil {
-			panic(err)
+			return nil, fmt.Errorf("failed to open database: %w", err)
 		}
 
 		// Создадим необходимые таблицы в базе данных
 		driver, err := postgres.WithInstance(db, &postgres.Config{})
 		if err != nil {
-			panic(err)
+			db.Close()
+			return nil, fmt.Errorf("failed to create postgres driver: %w", err)
 		}
 		m, err := migrate.NewWithDatabaseInstance(
 			"file://migrations",
 			"postgres", driver)
 		if err != nil {
-			panic(err)
+			db.Close()
+			return nil, fmt.Errorf("failed to create migrate instance: %w", err)
 		}
 		err = m.Migrate(1) // or m.Steps(2) if you want to explicitly set the number of migrations to run
 		if err != nil && !errors.Is(err, migrate.ErrNoChange) {
-			panic(err)
+			db.Close()
+			return nil, fmt.Errorf("failed to run migrations: %w", err)
 		}
-		return db
+		return db, nil
 	}
 
-	return nil
-
+	return nil, nil
 }
 
-func NewSugaredLogger() *zap.SugaredLogger {
+func NewSugaredLogger() (*zap.SugaredLogger, error) {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	sugar := *logger.Sugar()
 
-	return &sugar
+	return &sugar, nil
 }
 
 func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux, ms *repository.MemoryMetricsStorage, db *sql.DB) *http.Server {

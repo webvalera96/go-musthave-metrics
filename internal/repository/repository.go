@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -31,7 +32,8 @@ func (ms *MemoryMetricsStorage) Reconcile(duration time.Duration, fileStoragePat
 		time.Sleep(duration * time.Second)
 		err := ms.Save(fileStoragePath)
 		if err != nil {
-			panic("unable to save")
+			log.Printf("error saving metrics to file %s: %v", fileStoragePath, err)
+			// Продолжаем работу, не паникуем
 		}
 	}
 }
@@ -42,7 +44,8 @@ func (ms *MemoryMetricsStorage) ReconcileDB(duration time.Duration,
 		time.Sleep(duration * time.Second)
 		err := ms.SaveDB(db, timeout)
 		if err != nil {
-			panic(err)
+			log.Printf("error saving metrics to database: %v", err)
+			// Продолжаем работу, не паникуем
 		}
 	}
 }
