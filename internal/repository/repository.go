@@ -39,7 +39,7 @@ func (ms *MemoryMetricsStorage) Reconcile(duration time.Duration, fileStoragePat
 func (ms *MemoryMetricsStorage) ReconcileDB(duration time.Duration,
 	db *sql.DB, timeout time.Duration) {
 	for {
-
+		time.Sleep(duration * time.Second)
 		err := ms.SaveDB(db, timeout)
 		if err != nil {
 			panic(err)
