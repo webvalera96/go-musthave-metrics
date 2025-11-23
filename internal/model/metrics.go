@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/webvalera96/go-musthave-metrics/internal/retry"
@@ -33,7 +32,7 @@ func ReadDB(db *sql.DB, timeout time.Duration) ([]Metrics, error) {
 	err := retry.Retry(func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)
 		defer cancel()
-		query := "SELECT * FROM metrics"
+		query := "SELECT id, type, delta, value, hash FROM metrics"
 		rows, err := db.QueryContext(ctx, query)
 
 		if err != nil {
@@ -50,10 +49,25 @@ func ReadDB(db *sql.DB, timeout time.Duration) ([]Metrics, error) {
 
 		for rows.Next() {
 			var metric Metrics
-			err := rows.Scan(&metric)
+			var delta sql.NullInt64
+			var value sql.NullFloat64
+			var hash sql.NullString
+
+			err := rows.Scan(&metric.ID, &metric.MType, &delta, &value, &hash)
 			if err != nil {
 				return err
 			}
+
+			if delta.Valid {
+				metric.Delta = &delta.Int64
+			}
+			if value.Valid {
+				metric.Value = &value.Float64
+			}
+			if hash.Valid {
+				metric.Hash = hash.String
+			}
+
 			metrics = append(metrics, metric)
 		}
 		return nil
@@ -70,28 +84,28 @@ func (m Metrics) SaveDB(db *sql.DB, timeout time.Duration) (string, error) {
 	var result string
 
 	err := retry.Retry(func() error {
-		// Проверяем, есть ли в базе данных такая запись
-		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM metrics WHERE id = '%s')", m.ID)
-		exists := false
 		ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)
 		defer cancel()
-		err := db.QueryRowContext(ctx, query).Scan(&exists)
+
+		// Проверяем, есть ли в базе данных такая запись
+		query := "SELECT EXISTS(SELECT 1 FROM metrics WHERE id = $1)"
+		exists := false
+		err := db.QueryRowContext(ctx, query, m.ID).Scan(&exists)
 		if err != nil {
 			return err
 		}
 
 		if !exists {
 			// Запись не существует, тогда добавляем запись в базу данных
-			query = fmt.Sprintf("INSERT INTO metrics (id, type, delta, value, hash) VALUES ('%s', '%s', %d, %d, '%s')", m.ID, m.MType, m.Delta, m.Value, m.Hash)
-
-			_, err := db.ExecContext(ctx, query)
+			query = "INSERT INTO metrics (id, type, delta, value, hash) VALUES ($1, $2, $3, $4, $5)"
+			_, err := db.ExecContext(ctx, query, m.ID, m.MType, m.Delta, m.Value, m.Hash)
 			if err != nil {
 				return err
 			}
 		} else {
 			// Запись существует, тогда ее надо обновить
-			query = fmt.Sprintf("UPDATE metrics SET type = '%s', delta = %d, value = %d, hash = '%s' WHERE id = '%s'", m.MType, m.Delta, m.Value, m.Hash, m.ID)
-			_, err := db.ExecContext(ctx, query)
+			query = "UPDATE metrics SET type = $1, delta = $2, value = $3, hash = $4 WHERE id = $5"
+			_, err := db.ExecContext(ctx, query, m.MType, m.Delta, m.Value, m.Hash, m.ID)
 			if err != nil {
 				return err
 			}
