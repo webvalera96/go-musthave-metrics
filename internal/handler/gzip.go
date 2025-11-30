@@ -71,6 +71,7 @@ func GzipHandleWithHash(next http.Handler) http.Handler {
 			hashWriter := &hashGzipResponseWriter{
 				body:       &bytes.Buffer{},
 				statusCode: http.StatusOK,
+				headers:    make(http.Header),
 			}
 
 			gzw, err := gzip.NewWriterLevel(hashWriter, gzip.BestSpeed)
@@ -79,7 +80,12 @@ func GzipHandleWithHash(next http.Handler) http.Handler {
 				return
 			}
 
-			writer := zip.GzipWriter{ResponseWriter: w, Writer: gzw}
+			// Создаем обертку, которая перехватывает заголовки
+			writer := &gzipHashWriter{
+				ResponseWriter: w,
+				gzipWriter:     gzw,
+				hashWriter:     hashWriter,
+			}
 
 			next.ServeHTTP(writer, r)
 
@@ -90,16 +96,23 @@ func GzipHandleWithHash(next http.Handler) http.Handler {
 			compressedBody := hashWriter.body.Bytes()
 			hashValue := hash.CalculateHash(compressedBody, flags.FlagKey)
 
-			// Устанавливаем заголовки
+			// Копируем заголовки из обертки (если они были установлены handler'ом)
+			for k, v := range hashWriter.headers {
+				w.Header()[k] = v
+			}
+
+			// Устанавливаем заголовки сжатия и хеша
 			w.Header().Set("Content-Encoding", "gzip")
 			if hashValue != "" {
 				w.Header().Set("HashSHA256", hashValue)
 			}
 
-			// Отправляем ответ
-			if hashWriter.statusCode != 0 {
-				w.WriteHeader(hashWriter.statusCode)
+			// Отправляем ответ (заголовки отправляются здесь)
+			statusCode := hashWriter.statusCode
+			if statusCode == 0 {
+				statusCode = http.StatusOK
 			}
+			w.WriteHeader(statusCode)
 			w.Write(compressedBody)
 		} else if flags.FlagKey != "" {
 			// Ключ задан, но сжатие не применяется
@@ -145,6 +158,7 @@ func GzipHandleWithHash(next http.Handler) http.Handler {
 type hashGzipResponseWriter struct {
 	body       *bytes.Buffer
 	statusCode int
+	headers    http.Header
 }
 
 func (hw *hashGzipResponseWriter) Write(b []byte) (int, error) {
@@ -155,4 +169,35 @@ func (hw *hashGzipResponseWriter) Write(b []byte) (int, error) {
 
 func (hw *hashGzipResponseWriter) WriteHeader(statusCode int) {
 	hw.statusCode = statusCode
+}
+
+type gzipHashWriter struct {
+	http.ResponseWriter
+	gzipWriter *gzip.Writer
+	hashWriter *hashGzipResponseWriter
+	headerWritten bool
+}
+
+func (gw *gzipHashWriter) Write(b []byte) (int, error) {
+	// Если WriteHeader еще не был вызван, вызываем его с кодом 200
+	if !gw.headerWritten {
+		gw.WriteHeader(http.StatusOK)
+	}
+	// Записываем в gzip writer, который сжимает и пишет в hashWriter
+	return gw.gzipWriter.Write(b)
+}
+
+func (gw *gzipHashWriter) WriteHeader(statusCode int) {
+	// Сохраняем заголовки и статус код, но не отправляем их сразу
+	// Копируем заголовки из ResponseWriter в hashWriter
+	for k, v := range gw.ResponseWriter.Header() {
+		gw.hashWriter.headers[k] = make([]string, len(v))
+		copy(gw.hashWriter.headers[k], v)
+	}
+	gw.hashWriter.statusCode = statusCode
+	gw.headerWritten = true
+}
+
+func (gw *gzipHashWriter) Header() http.Header {
+	return gw.ResponseWriter.Header()
 }
