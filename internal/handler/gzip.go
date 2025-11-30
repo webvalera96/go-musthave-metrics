@@ -173,8 +173,8 @@ func (hw *hashGzipResponseWriter) WriteHeader(statusCode int) {
 
 type gzipHashWriter struct {
 	http.ResponseWriter
-	gzipWriter *gzip.Writer
-	hashWriter *hashGzipResponseWriter
+	gzipWriter    *gzip.Writer
+	hashWriter    *hashGzipResponseWriter
 	headerWritten bool
 }
 
