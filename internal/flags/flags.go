@@ -79,12 +79,14 @@ func ParseFlags() {
 		FlagDatabaseDSN = databaseDSN
 	}
 
-	// Parse key
-	FlagKey, exist = os.LookupEnv(EnvKey)
-	if !exist {
-		flag.StringVar(&FlagKey, "k", "", "hash key for signing requests and responses")
-	}
+	// Parse key - всегда регистрируем флаг
+	flag.StringVar(&FlagKey, "k", "", "hash key for signing requests and responses")
 
 	flag.Parse()
+
+	// Перезаписываем значение из переменной окружения, если она задана
+	if key, exist := os.LookupEnv(EnvKey); exist {
+		FlagKey = key
+	}
 
 }
