@@ -11,11 +11,13 @@ const (
 	EnvAddress        = "ADDRESS"
 	EnvReportInterval = "REPORT_INTERVAL"
 	EnvPollInterval   = "POLL_INTERVAL"
+	EnvKey            = "KEY"
 )
 
 var FlagMetricsServer string
 var FlagPollInterval int
 var FlagReportPollInterval int
+var FlagKey string
 
 func ParseFlags() {
 	// Parse metrics server address
@@ -51,6 +53,12 @@ func ParseFlags() {
 		}
 	} else {
 		flag.IntVar(&FlagReportPollInterval, "r", 10, "report interval in seconds")
+	}
+
+	// Parse key
+	FlagKey, exist = os.LookupEnv(EnvKey)
+	if !exist {
+		flag.StringVar(&FlagKey, "k", "", "hash key for signing requests")
 	}
 
 	flag.Parse()

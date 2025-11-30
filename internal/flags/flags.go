@@ -13,6 +13,7 @@ const (
 	EnvFileStoragePath = "FILE_STORAGE_PATH"
 	EnvRestore         = "RESTORE"
 	EnvDatabaseDSN     = "DATABASE_DSN"
+	EnvKey             = "KEY"
 )
 
 var FlagRunAddr string
@@ -20,6 +21,7 @@ var FlagStoreInterval int
 var FlagStoragePath string
 var FlagRestore bool
 var FlagDatabaseDSN string
+var FlagKey string
 
 func ParseFlags() {
 	var exist bool
@@ -75,6 +77,12 @@ func ParseFlags() {
 
 	if exist {
 		FlagDatabaseDSN = databaseDSN
+	}
+
+	// Parse key
+	FlagKey, exist = os.LookupEnv(EnvKey)
+	if !exist {
+		flag.StringVar(&FlagKey, "k", "", "hash key for signing requests and responses")
 	}
 
 	flag.Parse()

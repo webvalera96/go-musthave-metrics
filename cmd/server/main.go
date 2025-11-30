@@ -177,7 +177,15 @@ func NewSugaredLogger() (*zap.SugaredLogger, error) {
 }
 
 func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux, ms *repository.MemoryMetricsStorage, db *sql.DB) *http.Server {
-	srv := &http.Server{Addr: flags.FlagRunAddr, Handler: handler.GzipHandle(mux)}
+	// Порядок middleware важен:
+	// 1. HashVerifyMiddleware - проверяет хеш от сжатого тела запроса (до gzip распаковки)
+	// 2. GzipHandle - распаковывает gzip в запросах и сжимает ответы
+	// 3. HashResponseMiddleware - добавляет хеш в ответы (от сжатого тела, если gzip применен)
+	// HashResponseMiddleware должен быть внутри GzipHandle, чтобы перехватывать сжатый вывод
+	handlerChain := handler.HashVerifyMiddleware(
+		handler.GzipHandleWithHash(mux),
+	)
+	srv := &http.Server{Addr: flags.FlagRunAddr, Handler: handlerChain}
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			ln, err := net.Listen("tcp", srv.Addr)

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/flags"
+	"github.com/webvalera96/go-musthave-metrics/internal/hash"
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
 	"github.com/webvalera96/go-musthave-metrics/internal/retry"
 	"github.com/webvalera96/go-musthave-metrics/internal/zip"
@@ -164,6 +165,12 @@ func sendMetricsBatch(
 		}
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("Content-Encoding", "gzip")
+
+		// Добавляем хеш заголовок, если ключ задан
+		if flags.FlagKey != "" {
+			hashValue := hash.CalculateHash(compressedBody, flags.FlagKey)
+			request.Header.Set("HashSHA256", hashValue)
+		}
 
 		response, err := client.Do(request)
 		if err != nil {
