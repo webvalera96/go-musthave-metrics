@@ -24,24 +24,29 @@ func HashVerifyMiddleware(next http.Handler) http.Handler {
 
 		// Если хеш передан, проверяем его
 		if receivedHash != "" {
-			// Читаем тело запроса (на этом этапе оно еще может быть сжатым)
+			// Читаем тело запроса (на этом этапе оно еще сжато, если есть Content-Encoding: gzip)
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
 				http.Error(w, "Unable to read request body", http.StatusBadRequest)
 				return
 			}
-			defer r.Body.Close()
-
-			// Восстанавливаем тело для последующего чтения
-			r.Body = io.NopCloser(bytes.NewBuffer(body))
+			if r.Body != nil {
+				r.Body.Close()
+			}
 
 			// Вычисляем хеш от тела запроса (сжатого, если есть gzip)
+			// Хеш должен быть вычислен от того же тела, что отправил агент (сжатого)
 			calculatedHash := hash.CalculateHash(body, flags.FlagKey)
 
 			if receivedHash != calculatedHash {
 				http.Error(w, "Hash mismatch", http.StatusBadRequest)
 				return
 			}
+
+			// Восстанавливаем тело для последующего чтения gzip middleware
+			// Важно: восстанавливаем именно сжатое тело, чтобы gzip middleware мог его распаковать
+			// Создаем новый буфер с исходными данными (сжатыми)
+			r.Body = io.NopCloser(bytes.NewBuffer(body))
 		}
 
 		next.ServeHTTP(w, r)

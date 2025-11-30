@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"compress/gzip"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -49,10 +50,11 @@ func GzipHandle(next http.Handler) http.Handler {
 func GzipHandleWithHash(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Обработка входящего gzip
-		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
+		contentEncoding := r.Header.Get("Content-Encoding")
+		if strings.Contains(contentEncoding, "gzip") {
 			gzr, err := gzip.NewReader(r.Body)
 			if err != nil {
-				io.WriteString(w, err.Error())
+				http.Error(w, fmt.Sprintf("Failed to create gzip reader: %v", err), http.StatusBadRequest)
 				return
 			}
 			defer gzr.Close()
