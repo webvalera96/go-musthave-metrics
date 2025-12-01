@@ -12,12 +12,14 @@ const (
 	EnvReportInterval = "REPORT_INTERVAL"
 	EnvPollInterval   = "POLL_INTERVAL"
 	EnvKey            = "KEY"
+	EnvRateLimit      = "RATE_LIMIT"
 )
 
 var FlagMetricsServer string
 var FlagPollInterval int
 var FlagReportPollInterval int
 var FlagKey string
+var FlagRateLimit int
 
 func ParseFlags() {
 	// Parse metrics server address
@@ -58,10 +60,22 @@ func ParseFlags() {
 	// Parse key - всегда регистрируем флаг
 	flag.StringVar(&FlagKey, "k", "", "hash key for signing requests")
 
+	// Parse rate limit - всегда регистрируем флаг
+	flag.IntVar(&FlagRateLimit, "l", 1, "rate limit for concurrent requests")
+
 	flag.Parse()
 
 	// Перезаписываем значение из переменной окружения, если она задана
 	if key, exist := os.LookupEnv(EnvKey); exist {
 		FlagKey = key
+	}
+
+	// Перезаписываем rate limit из переменной окружения, если она задана
+	if rateLimit, exist := os.LookupEnv(EnvRateLimit); exist {
+		var err error
+		FlagRateLimit, err = strconv.Atoi(rateLimit)
+		if err != nil {
+			log.Fatal("unable to parse RATE_LIMIT env value")
+		}
 	}
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"net/http"
-	"runtime"
 	"time"
 
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/flags"
@@ -11,65 +10,116 @@ import (
 	"go.uber.org/fx"
 )
 
-// const pollInterval = 2
-// const reportInterval = 10
-// const baseURL = "localhost:8080" //TODO: move to configuration of agent
+// MetricsCollectorProvider создает коллектор метрик
+func MetricsCollectorProvider(lc fx.Lifecycle) *metrics.MetricsCollector {
+	collector := metrics.NewMetricsCollector(100) // буфер на 100 батчей
 
-func MetricsUpdater(lc fx.Lifecycle) *metrics.RuntimeMetrics {
-	rm := metrics.RuntimeMetrics{}
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
+			// Горутина для сбора runtime метрик
 			go func() {
-				for {
-					// Pause between metrics gathering
-					time.Sleep(time.Second * time.Duration(flags.FlagPollInterval))
+				ticker := time.NewTicker(time.Second * time.Duration(flags.FlagPollInterval))
+				defer ticker.Stop()
 
-					// update current runtimeMetrics
-					var m runtime.MemStats
-					runtime.ReadMemStats(&m)
-					rm.Set(m)
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						collector.CollectRuntimeMetrics()
+					}
 				}
 			}()
+
+			// Горутина для сбора gopsutil метрик
+			go func() {
+				ticker := time.NewTicker(time.Second * time.Duration(flags.FlagPollInterval))
+				defer ticker.Stop()
+
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						collector.CollectGopsutilMetrics()
+					}
+				}
+			}()
+
+			// Горутина для отправки метрик в канал
+			go func() {
+				ticker := time.NewTicker(time.Second * time.Duration(flags.FlagReportPollInterval))
+				defer ticker.Stop()
+
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						collector.SendMetrics()
+					}
+				}
+			}()
+
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			rm = metrics.RuntimeMetrics{}
 			return nil
 		},
 	})
-	return &rm
+
+	return collector
 }
 
-func MetricsSender(lc fx.Lifecycle, runtimeMetrics *metrics.RuntimeMetrics) *http.Client {
-	client := http.Client{}
+// HTTPClientProvider создает HTTP клиент
+func HTTPClientProvider(lc fx.Lifecycle) *http.Client {
+	client := &http.Client{}
 	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			go func() {
-				for {
-					time.Sleep(time.Second * time.Duration(flags.FlagReportPollInterval))
-					runtimeMetrics.SendToMetricsStorage(&client)
-				}
-			}()
-			return nil
-		},
 		OnStop: func(ctx context.Context) error {
 			client.CloseIdleConnections()
 			return nil
 		},
 	})
-	return &client
+	return client
+}
+
+// WorkerPoolProvider создает и запускает пул воркеров
+func WorkerPoolProvider(lc fx.Lifecycle, collector *metrics.MetricsCollector, client *http.Client) *metrics.WorkerPool {
+	rateLimit := flags.FlagRateLimit
+	if rateLimit < 1 {
+		rateLimit = 1
+	}
+
+	pool := metrics.NewWorkerPool(
+		client,
+		flags.FlagMetricsServer,
+		rateLimit,
+		collector.GetMetricsChan(),
+	)
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			pool.Start(ctx)
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			pool.Stop()
+			return nil
+		},
+	})
+
+	return pool
 }
 
 func main() {
-
 	flags.ParseFlags()
 
 	fx.New(
 		fx.Provide(
-			MetricsUpdater,
-			MetricsSender,
+			MetricsCollectorProvider,
+			HTTPClientProvider,
+			WorkerPoolProvider,
 		),
-		fx.Invoke(func(*http.Client) {}),
+		fx.Invoke(func(*metrics.WorkerPool) {}),
 	).Run()
-
 }
