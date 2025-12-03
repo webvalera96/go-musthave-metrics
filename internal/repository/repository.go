@@ -31,8 +31,9 @@ func (ms *MemoryMetricsStorage) Unlock() {
 	ms.mu.Unlock()
 }
 
-func (ms *MemoryMetricsStorage) Reconcile(ctx context.Context, duration time.Duration, fileStoragePath string) {
-	// Если duration == 0, синхронное сохранение уже настроено в Set()
+// runPeriodicTask выполняет задачу периодически с использованием ticker
+// Останавливается при отмене контекста
+func runPeriodicTask(ctx context.Context, duration time.Duration, task func() error, errorMsg string) {
 	if duration == 0 {
 		return
 	}
@@ -43,35 +44,28 @@ func (ms *MemoryMetricsStorage) Reconcile(ctx context.Context, duration time.Dur
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			err := ms.Save(fileStoragePath)
+			err := task()
 			if err != nil {
-				log.Printf("error saving metrics to file %s: %v", fileStoragePath, err)
+				log.Printf("%s: %v", errorMsg, err)
 				// Продолжаем работу, не паникуем
 			}
 		}
 	}
 }
 
+func (ms *MemoryMetricsStorage) Reconcile(ctx context.Context, duration time.Duration, fileStoragePath string) {
+	// Если duration == 0, синхронное сохранение уже настроено в Set()
+	runPeriodicTask(ctx, duration, func() error {
+		return ms.Save(fileStoragePath)
+	}, "error saving metrics to file "+fileStoragePath)
+}
+
 func (ms *MemoryMetricsStorage) ReconcileDB(ctx context.Context, duration time.Duration,
 	db *sql.DB, timeout time.Duration) {
 	// Если duration == 0, синхронное сохранение уже настроено в Set()
-	if duration == 0 {
-		return
-	}
-	ticker := time.NewTicker(duration * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			err := ms.SaveDB(db, timeout)
-			if err != nil {
-				log.Printf("error saving metrics to database: %v", err)
-				// Продолжаем работу, не паникуем
-			}
-		}
-	}
+	runPeriodicTask(ctx, duration, func() error {
+		return ms.SaveDB(db, timeout)
+	}, "error saving metrics to database")
 }
 
 func (ms *MemoryMetricsStorage) Load(fileStoragePath string) error {
