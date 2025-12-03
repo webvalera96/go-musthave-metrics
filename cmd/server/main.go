@@ -44,6 +44,7 @@ func main() {
 		),
 		fx.Invoke(
 			Restore,
+			SetupSyncSave,
 			func(*http.Server) {},
 		),
 	).Run()
@@ -176,6 +177,26 @@ func NewSugaredLogger() (*zap.SugaredLogger, error) {
 	return &sugar, nil
 }
 
+func SetupSyncSave(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage, db *sql.DB, srv *http.Server) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			// Настраиваем синхронное сохранение, если STORE_INTERVAL == 0
+			// Зависимость от *http.Server гарантирует, что это выполнится после создания сервера,
+			// но до того, как сервер начнет обрабатывать запросы (так как сервер запускается в OnStart)
+			if flags.FlagStoreInterval == 0 {
+				if flags.FlagDatabaseDSN != "" {
+					ms.SetSyncSaveConfig(db, "", timeout, true)
+				} else if flags.FlagStoragePath != "" {
+					ms.SetSyncSaveConfig(nil, flags.FlagStoragePath, timeout, true)
+				}
+				// Если оба пустые - используем память, синхронное сохранение не нужно
+			}
+			_ = srv // используем параметр, чтобы создать зависимость
+			return nil
+		},
+	})
+}
+
 func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux, ms *repository.MemoryMetricsStorage, db *sql.DB) *http.Server {
 	// Порядок middleware важен:
 	// 1. HashVerifyMiddleware - проверяет хеш от сжатого тела запроса (до gzip распаковки)
@@ -197,14 +218,19 @@ func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux, ms *repository.MemoryMetricsSt
 
 			// Приоритет: DATABASE_DSN > FILE_STORAGE_PATH > память
 			duration := time.Duration(flags.FlagStoreInterval)
-			if flags.FlagDatabaseDSN != "" {
-				// Используем БД
-				go ms.ReconcileDB(duration, db, timeout)
-			} else if flags.FlagStoragePath != "" {
-				// Используем файл
-				go ms.Reconcile(duration, flags.FlagStoragePath)
+
+			// Асинхронное сохранение - запускаем периодическое сохранение только если STORE_INTERVAL > 0
+			if duration > 0 {
+				if flags.FlagDatabaseDSN != "" {
+					// Используем БД
+					go ms.ReconcileDB(ctx, duration, db, timeout)
+				} else if flags.FlagStoragePath != "" {
+					// Используем файл
+					go ms.Reconcile(ctx, duration, flags.FlagStoragePath)
+				}
+				// Если оба пустые - используем память, периодическое сохранение не запускаем
 			}
-			// Если оба пустые - используем память, периодическое сохранение не запускаем
+			// Если duration == 0, синхронное сохранение уже настроено в SetupSyncSave
 
 			return nil
 		},

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"log"
 	"os"
 	"sync"
 	"time"
@@ -15,8 +14,12 @@ import (
 )
 
 type MemoryMetricsStorage struct {
-	mu   sync.Mutex
-	data map[string]*models.Metrics
+	mu              sync.Mutex
+	data            map[string]*models.Metrics
+	db              *sql.DB
+	fileStoragePath string
+	timeout         time.Duration
+	syncSave        bool // если true, сохранять синхронно после каждого обновления
 }
 
 func (ms *MemoryMetricsStorage) Lock() {
@@ -27,25 +30,43 @@ func (ms *MemoryMetricsStorage) Unlock() {
 	ms.mu.Unlock()
 }
 
-func (ms *MemoryMetricsStorage) Reconcile(duration time.Duration, fileStoragePath string) {
+func (ms *MemoryMetricsStorage) Reconcile(ctx context.Context, duration time.Duration, fileStoragePath string) {
+	// Если duration == 0, синхронное сохранение уже настроено в Set()
+	if duration == 0 {
+		return
+	}
+	ticker := time.NewTicker(duration * time.Second)
+	defer ticker.Stop()
 	for {
-		time.Sleep(duration * time.Second)
-		err := ms.Save(fileStoragePath)
-		if err != nil {
-			log.Printf("error saving metrics to file %s: %v", fileStoragePath, err)
-			// Продолжаем работу, не паникуем
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			err := ms.Save(fileStoragePath)
+			if err != nil {
+				// Продолжаем работу, не паникуем
+			}
 		}
 	}
 }
 
-func (ms *MemoryMetricsStorage) ReconcileDB(duration time.Duration,
+func (ms *MemoryMetricsStorage) ReconcileDB(ctx context.Context, duration time.Duration,
 	db *sql.DB, timeout time.Duration) {
+	// Если duration == 0, синхронное сохранение уже настроено в Set()
+	if duration == 0 {
+		return
+	}
+	ticker := time.NewTicker(duration * time.Second)
+	defer ticker.Stop()
 	for {
-		time.Sleep(duration * time.Second)
-		err := ms.SaveDB(db, timeout)
-		if err != nil {
-			log.Printf("error saving metrics to database: %v", err)
-			// Продолжаем работу, не паникуем
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			err := ms.SaveDB(db, timeout)
+			if err != nil {
+				// Продолжаем работу, не паникуем
+			}
 		}
 	}
 }
@@ -150,23 +171,40 @@ func (ms *MemoryMetricsStorage) Get(k string) (*models.Metrics, error) {
 
 func (ms *MemoryMetricsStorage) Set(m *models.Metrics) error {
 	ms.mu.Lock()
-	defer ms.mu.Unlock()
 
 	if m.MType == models.Counter && ms.data[m.ID] != nil {
 		if ms.data[m.ID].Delta == nil {
+			ms.mu.Unlock()
 			return errors.New("corrupted database")
 		}
 
 		if m.Delta == nil {
+			ms.mu.Unlock()
 			return errors.New("delta cannot be nil")
 		}
 
 		newDelta := *(ms.data[m.ID].Delta) + *(m.Delta)
 		ms.data[m.ID].Delta = &newDelta
-		return nil
+	} else {
+		ms.data[m.ID] = m
 	}
 
-	ms.data[m.ID] = m
+	syncSave := ms.syncSave
+	db := ms.db
+	fileStoragePath := ms.fileStoragePath
+	timeout := ms.timeout
+
+	ms.mu.Unlock()
+
+	// Если включено синхронное сохранение, сохраняем сразу после обновления
+	if syncSave {
+		if db != nil {
+			return ms.SaveDB(db, timeout)
+		} else if fileStoragePath != "" {
+			return ms.Save(fileStoragePath)
+		}
+	}
+
 	return nil
 }
 
@@ -188,4 +226,14 @@ func CreateMemoryMetricsStorage(lc fx.Lifecycle) *MemoryMetricsStorage {
 		},
 	})
 	return &storage
+}
+
+// SetSyncSaveConfig настраивает параметры для синхронного сохранения
+func (ms *MemoryMetricsStorage) SetSyncSaveConfig(db *sql.DB, fileStoragePath string, timeout time.Duration, syncSave bool) {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+	ms.db = db
+	ms.fileStoragePath = fileStoragePath
+	ms.timeout = timeout
+	ms.syncSave = syncSave
 }
