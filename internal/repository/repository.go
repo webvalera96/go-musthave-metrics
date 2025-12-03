@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -44,6 +45,7 @@ func (ms *MemoryMetricsStorage) Reconcile(ctx context.Context, duration time.Dur
 		case <-ticker.C:
 			err := ms.Save(fileStoragePath)
 			if err != nil {
+				log.Printf("error saving metrics to file %s: %v", fileStoragePath, err)
 				// Продолжаем работу, не паникуем
 			}
 		}
@@ -65,6 +67,7 @@ func (ms *MemoryMetricsStorage) ReconcileDB(ctx context.Context, duration time.D
 		case <-ticker.C:
 			err := ms.SaveDB(db, timeout)
 			if err != nil {
+				log.Printf("error saving metrics to database: %v", err)
 				// Продолжаем работу, не паникуем
 			}
 		}
