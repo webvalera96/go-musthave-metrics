@@ -51,21 +51,35 @@ func NewUpdateBatchHandler(ms *repository.MemoryMetricsStorage, auditSubject *au
 }
 
 // getClientIP возвращает IP адрес клиента из заголовков или RemoteAddr.
+// Использует trimSpace без аллокаций для X-Forwarded-For.
 func getClientIP(r *http.Request) string {
 	if s := r.Header.Get("X-Real-IP"); s != "" {
 		return s
 	}
 	if s := r.Header.Get("X-Forwarded-For"); s != "" {
 		if i := strings.Index(s, ","); i >= 0 {
-			return strings.TrimSpace(s[:i])
+			return trimSpace(s[:i])
 		}
-		return strings.TrimSpace(s)
+		return trimSpace(s)
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+// trimSpace возвращает подстроку s без ведущих и конечных пробелов, без аллокаций.
+func trimSpace(s string) string {
+	start := 0
+	for start < len(s) && (s[start] == ' ' || s[start] == '\t') {
+		start++
+	}
+	end := len(s)
+	for end > start && (s[end-1] == ' ' || s[end-1] == '\t') {
+		end--
+	}
+	return s[start:end]
 }
 
 func (uh *UpdateJSONHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

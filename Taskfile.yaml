@@ -123,6 +123,31 @@ tasks:
       - task: db
       - migrate -path ./migrations -database postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable down
       - migrate -path ./migrations -database postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable up
-      
+
+  benchmark:
+    desc: "Run benchmarks for repository, hash, handler"
+    cmds:
+      - go test -bench=. -benchmem ./internal/repository/ ./internal/hash/ ./internal/handler/
+
+  profile-base:
+    desc: "Capture base memory profile (profiles/base.pprof)"
+    cmds:
+      - go test -bench=BenchmarkUpdateBatchHandler_ServeHTTP -benchtime=3s -memprofile=profiles/base.pprof -memprofilerate=1 ./internal/handler/
+
+  profile-result:
+    desc: "Capture result memory profile after optimizations (profiles/result.pprof)"
+    cmds:
+      - go test -bench=BenchmarkUpdateBatchHandler_ServeHTTP -benchtime=3s -memprofile=profiles/result.pprof -memprofilerate=1 ./internal/handler/
+
+  pprof-top:
+    desc: "Show pprof top for result profile (go tool pprof -top profiles/result.pprof)"
+    cmds:
+      - go tool pprof -top -alloc_space profiles/result.pprof
+
+  pprof-base:
+    desc: "Show pprof top for base profile"
+    cmds:
+      - go tool pprof -top -alloc_space profiles/base.pprof
+
 
 

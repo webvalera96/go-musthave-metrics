@@ -95,7 +95,8 @@ func (ms *MemoryMetricsStorage) Load(fileStoragePath string) error {
 	ms.Make()
 
 	for _, metric := range metrics {
-		ms.data[metric.ID] = &metric
+		m := metric
+		ms.data[m.ID] = &m
 	}
 
 	return nil
@@ -113,7 +114,8 @@ func (ms *MemoryMetricsStorage) LoadDB(db *sql.DB, timeout time.Duration) error 
 	ms.Make()
 
 	for _, metric := range metrics {
-		ms.data[metric.ID] = &metric
+		m := metric
+		ms.data[m.ID] = &m
 	}
 
 	return nil

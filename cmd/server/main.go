@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"time"
 
+	_ "net/http/pprof" // регистрация /debug/pprof для профилирования
+
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
@@ -47,6 +49,7 @@ func main() {
 		fx.Invoke(
 			Restore,
 			SetupSyncSave,
+			StartPprofServer,
 			func(*http.Server) {},
 		),
 	).Run()
@@ -183,6 +186,18 @@ func NewSugaredLogger() (*zap.SugaredLogger, error) {
 // Если оба параметра пусты, приёмников не будет — аудит отключён.
 func NewAuditSubject() *audit.Subject {
 	return audit.NewSubjectFromConfig(flags.FlagAuditFile, flags.FlagAuditURL)
+}
+
+// StartPprofServer запускает HTTP-сервер для pprof на localhost:6060 (heap, goroutine, allocs и т.д.).
+func StartPprofServer(lc fx.Lifecycle) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			go func() {
+				_ = http.ListenAndServe("localhost:6060", nil)
+			}()
+			return nil
+		},
+	})
 }
 
 func SetupSyncSave(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage, db *sql.DB, srv *http.Server) {
