@@ -1,0 +1,153 @@
+version: "3"
+
+tasks:
+  _buildServerWindows:
+    desc: "Internal: Build server (windows)"
+    internal: true
+    platforms: [windows]
+    cmds:
+      - go build -o cmd/server/server.exe cmd/server/main.go
+
+  _buildServerDarwin:
+    desc: "Internal: Build server (darwin)"
+    internal: true
+    platforms:
+      - darwin
+    cmds:
+      - go build -o cmd/server/server cmd/server/main.go
+
+  _buildAgentWindows:
+    desc: "Internal: Build agent (windows)"
+    internal: true
+    platforms: [ windows ]
+    cmds:
+      - go build -o cmd/agent/agent.exe cmd/agent/main.go
+
+  _buildAgentDarwin:
+    desc: "Internal: Build agent (darwin)"
+    internal: true
+    platforms:
+      - darwin
+    cmds:
+      - go build -o cmd/agent/agent cmd/agent/main.go
+
+  _downloadAutoTestsWindows:
+    desc: "Internal: Download autotest (windows)"
+    internal: true
+    platforms:
+      - windows/amd64
+    cmds:
+      - curl -L -O https://github.com/Yandex-Practicum/go-autotests/releases/download/v0.13.2/metricstest-windows-amd64.exe
+
+  _downloadAutoTestsDarwin:
+    desc: "Internal: Download autotest (darwin)"
+    internal: true
+    platforms:
+      - darwin
+    cmds:
+      - curl -L -O https://github.com/Yandex-Practicum/go-autotests/releases/download/v0.13.2/metricstest-darwin-arm64
+      - chmod +x metricstest-darwin-arm64
+
+  _runAutoTestsWindows:
+    desc: "Internal: Run autotest (windows)"
+    internal: true
+    platforms:
+      - windows/amd64
+    cmds:
+      # - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration1$ -binary-path=cmd/server/server.exe
+      # - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration2$ -binary-path=cmd/server/server.exe
+      # - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration3$ -binary-path=cmd/server/server.exe
+      # - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration4$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=.
+      # - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration5$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=.
+      # - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration6$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=.
+      # - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration7$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=.
+      # - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration8$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=.
+      # - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration9$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=. -file-storage-path=data.db
+      - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration10A$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=. -database-dsn='postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable'
+      - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration10B$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=. -database-dsn='postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable'
+      - ./metricstest-windows-amd64.exe -test.v -test.run=^TestIteration11$ -binary-path=cmd/server/server.exe -agent-binary-path=cmd/agent/agent.exe -server-port 8080 -source-path=. -database-dsn='postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable'
+  _runAutoTestsDarwin:
+    desc: "Internal: Run auotest (darwin)"
+    platforms:
+      - darwin
+    cmds:
+     - task: db
+    #  - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration1$ -binary-path=cmd/server/server
+    #  - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration2$ -binary-path=cmd/server/server
+    #  - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration3$ -binary-path=cmd/server/server
+    #  - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration4$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
+    #  - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration5$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
+    #  - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration6$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
+    #  - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration7$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
+    #  - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration8$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=.
+    #  - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration9$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=. -file-storage-path=data.db
+    #  - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration10A$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=. -database-dsn='postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable'
+    #  - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration10B$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=. -database-dsn='postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable'
+    #  - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration11$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=. -database-dsn='postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable'
+    #  - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration12$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=. -database-dsn='postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable'
+     - ./metricstest-darwin-arm64 -test.v -test.run=^TestIteration13$ -binary-path=cmd/server/server -agent-binary-path=cmd/agent/agent -server-port 8080 -source-path=. -database-dsn='postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable'
+  _runAutoTestDarwin:
+    desc: "Internal: Run autotest"
+
+  build:
+    desc: "Build server and agent"
+    cmds:
+      - task: _buildServerWindows
+      - task: _buildAgentWindows
+      - task: _buildServerDarwin
+      - task: _buildAgentDarwin
+
+  vet:
+    desc: "go vet"
+    cmds:
+      - go vet ./...
+
+  test:
+    desc: "Run autotest"
+    cmds:
+      - task: vet
+      - task: build
+      - task: _downloadAutoTestsWindows
+      - task: _downloadAutoTestsDarwin
+      - task: _runAutoTestsWindows
+      - task: _runAutoTestsDarwin
+
+  db:
+    desc: "Run db in docker"
+    cmds:
+      - docker compose -f db-compose.yml up -d 
+
+  migrate:
+    desc: "Run migrations"
+    cmds:
+      - task: db
+      - migrate -path ./migrations -database postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable down
+      - migrate -path ./migrations -database postgres://postgres:postgres@localhost:5432/praktikum?sslmode=disable up
+
+  benchmark:
+    desc: "Run benchmarks for repository, hash, handler"
+    cmds:
+      - go test -bench=. -benchmem ./internal/repository/ ./internal/hash/ ./internal/handler/
+
+  profile-base:
+    desc: "Capture base memory profile (profiles/base.pprof)"
+    cmds:
+      - go test -bench=BenchmarkUpdateBatchHandler_ServeHTTP -benchtime=3s -memprofile=profiles/base.pprof -memprofilerate=1 ./internal/handler/
+
+  profile-result:
+    desc: "Capture result memory profile after optimizations (profiles/result.pprof)"
+    cmds:
+      - go test -bench=BenchmarkUpdateBatchHandler_ServeHTTP -benchtime=3s -memprofile=profiles/result.pprof -memprofilerate=1 ./internal/handler/
+
+  pprof-top:
+    desc: "Show pprof top for result profile (go tool pprof -top profiles/result.pprof)"
+    cmds:
+      - go tool pprof -top -alloc_space profiles/result.pprof
+
+  pprof-base:
+    desc: "Show pprof top for base profile"
+    cmds:
+      - go tool pprof -top -alloc_space profiles/base.pprof
+
+
+
