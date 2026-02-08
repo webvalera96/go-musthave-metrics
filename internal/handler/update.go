@@ -109,7 +109,7 @@ func (uh *UpdateJSONHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uh.auditSubject.NotifyAll(audit.Event{
-		Ts:        time.Now().Unix(),
+		TS:        time.Now().Unix(),
 		Metrics:   []string{data.ID},
 		IPAddress: getClientIP(r),
 	})
@@ -152,7 +152,7 @@ func (uh *UpdateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uh.auditSubject.NotifyAll(audit.Event{
-		Ts:        time.Now().Unix(),
+		TS:        time.Now().Unix(),
 		Metrics:   []string{metricName},
 		IPAddress: getClientIP(r),
 	})
@@ -259,7 +259,7 @@ func (uh *UpdateBatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	uh.auditSubject.NotifyAll(audit.Event{
-		Ts:        time.Now().Unix(),
+		TS:        time.Now().Unix(),
 		Metrics:   metricNames,
 		IPAddress: getClientIP(r),
 	})
