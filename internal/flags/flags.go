@@ -14,6 +14,8 @@ const (
 	EnvRestore         = "RESTORE"
 	EnvDatabaseDSN     = "DATABASE_DSN"
 	EnvKey             = "KEY"
+	EnvAuditFile       = "AUDIT_FILE"
+	EnvAuditURL        = "AUDIT_URL"
 )
 
 var FlagRunAddr string
@@ -22,6 +24,8 @@ var FlagStoragePath string
 var FlagRestore bool
 var FlagDatabaseDSN string
 var FlagKey string
+var FlagAuditFile string
+var FlagAuditURL string
 
 func ParseFlags() {
 	var exist bool
@@ -82,11 +86,20 @@ func ParseFlags() {
 	// Parse key - всегда регистрируем флаг
 	flag.StringVar(&FlagKey, "k", "", "hash key for signing requests and responses")
 
+	flag.StringVar(&FlagAuditFile, "audit-file", "", "path to file for audit logs")
+	flag.StringVar(&FlagAuditURL, "audit-url", "", "full URL to send audit logs via POST")
+
 	flag.Parse()
 
 	// Перезаписываем значение из переменной окружения, если она задана
 	if key, exist := os.LookupEnv(EnvKey); exist {
 		FlagKey = key
+	}
+	if v, exist := os.LookupEnv(EnvAuditFile); exist {
+		FlagAuditFile = v
+	}
+	if v, exist := os.LookupEnv(EnvAuditURL); exist {
+		FlagAuditURL = v
 	}
 
 }

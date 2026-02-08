@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/webvalera96/go-musthave-metrics/internal/audit"
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
 	"github.com/webvalera96/go-musthave-metrics/internal/repository"
 )
@@ -22,26 +25,47 @@ const (
 
 type UpdateHandler struct {
 	metricStorage *repository.MemoryMetricsStorage
+	auditSubject  *audit.Subject
 }
 
 type UpdateJSONHandler struct {
 	metricStorage *repository.MemoryMetricsStorage
+	auditSubject  *audit.Subject
 }
 
 type UpdateBatchHandler struct {
 	metricStorage *repository.MemoryMetricsStorage
+	auditSubject  *audit.Subject
 }
 
-func NewUpdateHandler(ms *repository.MemoryMetricsStorage) *UpdateHandler {
-
-	return &UpdateHandler{metricStorage: ms}
-}
-func NewUpdateJSONHandler(ms *repository.MemoryMetricsStorage) *UpdateJSONHandler {
-	return &UpdateJSONHandler{metricStorage: ms}
+func NewUpdateHandler(ms *repository.MemoryMetricsStorage, auditSubject *audit.Subject) *UpdateHandler {
+	return &UpdateHandler{metricStorage: ms, auditSubject: auditSubject}
 }
 
-func NewUpdateBatchHandler(ms *repository.MemoryMetricsStorage) *UpdateBatchHandler {
-	return &UpdateBatchHandler{metricStorage: ms}
+func NewUpdateJSONHandler(ms *repository.MemoryMetricsStorage, auditSubject *audit.Subject) *UpdateJSONHandler {
+	return &UpdateJSONHandler{metricStorage: ms, auditSubject: auditSubject}
+}
+
+func NewUpdateBatchHandler(ms *repository.MemoryMetricsStorage, auditSubject *audit.Subject) *UpdateBatchHandler {
+	return &UpdateBatchHandler{metricStorage: ms, auditSubject: auditSubject}
+}
+
+// getClientIP возвращает IP адрес клиента из заголовков или RemoteAddr.
+func getClientIP(r *http.Request) string {
+	if s := r.Header.Get("X-Real-IP"); s != "" {
+		return s
+	}
+	if s := r.Header.Get("X-Forwarded-For"); s != "" {
+		if i := strings.Index(s, ","); i >= 0 {
+			return strings.TrimSpace(s[:i])
+		}
+		return strings.TrimSpace(s)
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 func (uh *UpdateJSONHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -84,6 +108,12 @@ func (uh *UpdateJSONHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	uh.auditSubject.NotifyAll(audit.Event{
+		Ts:        time.Now().Unix(),
+		Metrics:   []string{data.ID},
+		IPAddress: getClientIP(r),
+	})
+
 	w.Header().Add("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
 	w.Write(nil)
@@ -118,7 +148,14 @@ func (uh *UpdateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		log.Print(err)
+		return
 	}
+
+	uh.auditSubject.NotifyAll(audit.Event{
+		Ts:        time.Now().Unix(),
+		Metrics:   []string{metricName},
+		IPAddress: getClientIP(r),
+	})
 }
 
 func updateMetric(
@@ -187,6 +224,7 @@ func (uh *UpdateBatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	metricNames := make([]string, 0, len(metrics))
 	for _, data := range metrics {
 		if data.MType == models.Counter {
 			if data.Delta == nil {
@@ -217,7 +255,14 @@ func (uh *UpdateBatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, fmt.Sprintf("Unable to save metric %s: (%s)", data.ID, err), http.StatusServiceUnavailable)
 			return
 		}
+		metricNames = append(metricNames, data.ID)
 	}
+
+	uh.auditSubject.NotifyAll(audit.Event{
+		Ts:        time.Now().Unix(),
+		Metrics:   metricNames,
+		IPAddress: getClientIP(r),
+	})
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

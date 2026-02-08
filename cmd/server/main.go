@@ -14,6 +14,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq" // PostgresSQL driver
+	"github.com/webvalera96/go-musthave-metrics/internal/audit"
 	"github.com/webvalera96/go-musthave-metrics/internal/flags"
 	"github.com/webvalera96/go-musthave-metrics/internal/handler"
 	"github.com/webvalera96/go-musthave-metrics/internal/handler/log"
@@ -35,6 +36,7 @@ func main() {
 			NewSugaredLogger,
 			NewChiMux,
 			NewDatabase,
+			NewAuditSubject,
 			handler.NewGetHandler,
 			handler.NewUpdateHandler,
 			handler.NewGetJSONHandler,
@@ -175,6 +177,12 @@ func NewSugaredLogger() (*zap.SugaredLogger, error) {
 	sugar := *logger.Sugar()
 
 	return &sugar, nil
+}
+
+// NewAuditSubject создаёт субъект аудита с приёмниками по флагам (файл и/или URL).
+// Если оба параметра пусты, приёмников не будет — аудит отключён.
+func NewAuditSubject() *audit.Subject {
+	return audit.NewSubjectFromConfig(flags.FlagAuditFile, flags.FlagAuditURL)
 }
 
 func SetupSyncSave(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage, db *sql.DB, srv *http.Server) {

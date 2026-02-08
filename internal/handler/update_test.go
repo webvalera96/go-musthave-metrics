@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/webvalera96/go-musthave-metrics/internal/audit"
 	"github.com/webvalera96/go-musthave-metrics/internal/repository"
 )
 
@@ -63,12 +64,13 @@ func TestMetricUpdate(t *testing.T) {
 	}
 	storage := repository.MemoryMetricsStorage{}
 	storage.Make()
+	auditSubject := audit.NewSubject() // без приёмников для тестов
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, tt.request, nil)
 			request = AddChiURLParams(request, tt.chiParams)
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(NewUpdateHandler(&storage).ServeHTTP)
+			h := http.HandlerFunc(NewUpdateHandler(&storage, auditSubject).ServeHTTP)
 			h(w, request)
 
 			result := w.Result()
