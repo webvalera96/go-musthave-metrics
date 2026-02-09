@@ -7,10 +7,12 @@ import (
 	"github.com/webvalera96/go-musthave-metrics/internal/retry"
 )
 
+// PingHandler handles GET /ping and checks DB connectivity.
 type PingHandler struct {
 	db *sql.DB
 }
 
+// NewPingHandler creates a handler for /ping.
 func NewPingHandler(db *sql.DB) *PingHandler {
 	return &PingHandler{db: db}
 }

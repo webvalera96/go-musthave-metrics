@@ -23,29 +23,35 @@ const (
 	MetricValue = 2
 )
 
+// UpdateHandler handles POST /update/{metricType}/{metricName}/{metricValue}.
 type UpdateHandler struct {
 	metricStorage *repository.MemoryMetricsStorage
 	auditSubject  *audit.Subject
 }
 
+// UpdateJSONHandler handles POST /update/ with JSON body (single metric).
 type UpdateJSONHandler struct {
 	metricStorage *repository.MemoryMetricsStorage
 	auditSubject  *audit.Subject
 }
 
+// UpdateBatchHandler handles POST /updates/ with JSON array of metrics.
 type UpdateBatchHandler struct {
 	metricStorage *repository.MemoryMetricsStorage
 	auditSubject  *audit.Subject
 }
 
+// NewUpdateHandler creates handler for URL-path metric updates.
 func NewUpdateHandler(ms *repository.MemoryMetricsStorage, auditSubject *audit.Subject) *UpdateHandler {
 	return &UpdateHandler{metricStorage: ms, auditSubject: auditSubject}
 }
 
+// NewUpdateJSONHandler creates handler for single-metric JSON updates.
 func NewUpdateJSONHandler(ms *repository.MemoryMetricsStorage, auditSubject *audit.Subject) *UpdateJSONHandler {
 	return &UpdateJSONHandler{metricStorage: ms, auditSubject: auditSubject}
 }
 
+// NewUpdateBatchHandler creates handler for batch JSON updates.
 func NewUpdateBatchHandler(ms *repository.MemoryMetricsStorage, auditSubject *audit.Subject) *UpdateBatchHandler {
 	return &UpdateBatchHandler{metricStorage: ms, auditSubject: auditSubject}
 }

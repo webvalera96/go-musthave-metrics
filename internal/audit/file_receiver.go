@@ -6,13 +6,13 @@ import (
 	"sync"
 )
 
-// FileReceiver записывает события аудита в файл (каждое событие — новая строка в конце файла).
+// FileReceiver appends audit events as JSON lines to a file.
 type FileReceiver struct {
 	path string
 	mu   sync.Mutex
 }
 
-// NewFileReceiver создаёт приёмник, пишущий в указанный файл.
+// NewFileReceiver returns a receiver that writes to the given path.
 func NewFileReceiver(path string) *FileReceiver {
 	return &FileReceiver{path: path}
 }

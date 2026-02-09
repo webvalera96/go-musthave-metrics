@@ -14,13 +14,14 @@ import (
 	"go.uber.org/fx"
 )
 
+// MemoryMetricsStorage stores metrics in memory; can persist to file or DB.
 type MemoryMetricsStorage struct {
 	mu              sync.Mutex
 	data            map[string]*models.Metrics
 	db              *sql.DB
 	fileStoragePath string
 	timeout         time.Duration
-	syncSave        bool // если true, сохранять синхронно после каждого обновления
+	syncSave        bool
 }
 
 func (ms *MemoryMetricsStorage) Lock() {
@@ -153,10 +154,12 @@ func (ms *MemoryMetricsStorage) Save(fileStoragePath string) error {
 	return os.WriteFile(fileStoragePath, data, 0666)
 }
 
+// Make initializes the in-memory map (idempotent).
 func (ms *MemoryMetricsStorage) Make() {
 	ms.data = make(map[string]*models.Metrics)
 }
 
+// Get returns a metric by ID or error if not found.
 func (ms *MemoryMetricsStorage) Get(k string) (*models.Metrics, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -168,6 +171,7 @@ func (ms *MemoryMetricsStorage) Get(k string) (*models.Metrics, error) {
 	}
 }
 
+// Set stores or updates a metric (counter is incremented).
 func (ms *MemoryMetricsStorage) Set(m *models.Metrics) error {
 	ms.mu.Lock()
 
@@ -207,6 +211,7 @@ func (ms *MemoryMetricsStorage) Set(m *models.Metrics) error {
 	return nil
 }
 
+// MetricsStorage is the storage interface for metrics.
 type MetricsStorage interface {
 	Get(k string) *models.Metrics
 	Add(k string, m *models.Metrics) error

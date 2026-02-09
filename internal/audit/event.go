@@ -1,6 +1,6 @@
 package audit
 
-// Event — событие аудита в формате для логирования.
+// Event is an audit log entry (timestamp, metric names, client IP).
 type Event struct {
 	TS        int64    `json:"ts"`         // unix timestamp события
 	Metrics   []string `json:"metrics"`   // наименования полученных метрик

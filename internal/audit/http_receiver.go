@@ -7,13 +7,13 @@ import (
 	"net/http"
 )
 
-// HTTPReceiver отправляет события аудита методом POST на заданный URL.
+// HTTPReceiver sends audit events via POST to a URL.
 type HTTPReceiver struct {
 	url    string
 	client *http.Client
 }
 
-// NewHTTPReceiver создаёт приёмник, отправляющий события по URL.
+// NewHTTPReceiver returns a receiver that POSTs to the given URL.
 func NewHTTPReceiver(url string) *HTTPReceiver {
 	return &HTTPReceiver{
 		url:    url,

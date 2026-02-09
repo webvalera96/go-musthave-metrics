@@ -1,24 +1,23 @@
 package audit
 
-// Receiver — приёмник событий аудита (наблюдатель).
+// Receiver receives audit events (observer).
 type Receiver interface {
-	// Notify отправляет событие аудита в приёмник.
 	Notify(event Event) error
 }
 
-// Subject — субъект, уведомляющий зарегистрированных наблюдателей о событиях аудита.
+// Subject notifies attached receivers on audit events.
 type Subject struct {
 	receivers []Receiver
 }
 
-// NewSubject создаёт новый субъект без приёмников.
+// NewSubject returns a subject with no receivers.
 func NewSubject() *Subject {
 	return &Subject{
 		receivers: nil,
 	}
 }
 
-// Attach добавляет приёмник аудита.
+// Attach adds an audit receiver.
 func (s *Subject) Attach(r Receiver) {
 	if r == nil {
 		return
@@ -26,17 +25,14 @@ func (s *Subject) Attach(r Receiver) {
 	s.receivers = append(s.receivers, r)
 }
 
-// NotifyAll отправляет событие во все зарегистрированные приёмники.
-// Вызывается после успешной обработки метрик. Если приёмников нет, ничего не делает.
+// NotifyAll sends the event to all attached receivers.
 func (s *Subject) NotifyAll(event Event) {
 	for _, r := range s.receivers {
 		_ = r.Notify(event)
 	}
 }
 
-// NewSubjectFromConfig создаёт субъект и подключает приёмники по путям/URL.
-// auditFile — путь к файлу для логов (если пусто, файловый приёмник не добавляется).
-// auditURL — URL для отправки логов (если пусто, HTTP-приёмник не добавляется).
+// NewSubjectFromConfig builds a subject with file and/or HTTP receivers if paths are set.
 func NewSubjectFromConfig(auditFile, auditURL string) *Subject {
 	s := NewSubject()
 	if auditFile != "" {

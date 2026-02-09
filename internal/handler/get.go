@@ -12,18 +12,22 @@ import (
 	"github.com/webvalera96/go-musthave-metrics/internal/repository"
 )
 
+// GetHandler handles GET /value/{metricType}/{metricName}.
 type GetHandler struct {
 	metricStorage *repository.MemoryMetricsStorage
 }
 
+// GetJSONHandler handles POST /value/ with JSON body (returns metric by ID).
 type GetJSONHandler struct {
 	metricStorage *repository.MemoryMetricsStorage
 }
 
+// NewGetJSONHandler creates handler for JSON value requests.
 func NewGetJSONHandler(ms *repository.MemoryMetricsStorage) *GetJSONHandler {
 	return &GetJSONHandler{metricStorage: ms}
 }
 
+// NewGetHandler creates handler for URL-path value requests.
 func NewGetHandler(ms *repository.MemoryMetricsStorage) *GetHandler {
 	return &GetHandler{metricStorage: ms}
 }
