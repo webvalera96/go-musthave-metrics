@@ -12,16 +12,18 @@ import (
 type WorkerPool struct {
 	client      *http.Client
 	baseURL     string
+	hashKey     string
 	workers     int
 	metricsChan <-chan []models.Metrics
 	wg          sync.WaitGroup
 }
 
 // NewWorkerPool создает новый пул воркеров
-func NewWorkerPool(client *http.Client, baseURL string, workers int, metricsChan <-chan []models.Metrics) *WorkerPool {
+func NewWorkerPool(client *http.Client, baseURL string, hashKey string, workers int, metricsChan <-chan []models.Metrics) *WorkerPool {
 	return &WorkerPool{
 		client:      client,
 		baseURL:     baseURL,
+		hashKey:     hashKey,
 		workers:     workers,
 		metricsChan: metricsChan,
 	}
@@ -53,7 +55,7 @@ func (wp *WorkerPool) worker(ctx context.Context, id int) {
 				return
 			}
 			// Отправляем метрики
-			err := sendMetricsBatch(wp.client, wp.baseURL, metrics)
+			err := sendMetricsBatch(wp.client, wp.baseURL, wp.hashKey, metrics)
 			if err != nil {
 				// Логируем ошибку, но продолжаем работу
 				continue

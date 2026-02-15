@@ -11,19 +11,24 @@ import (
 )
 
 // MetricsCollectorProvider создает коллектор метрик
-func MetricsCollectorProvider(lc fx.Lifecycle) *metrics.MetricsCollector {
+func MetricsCollectorProvider(lc fx.Lifecycle, cfg *flags.AgentConfig) *metrics.MetricsCollector {
 	collector := metrics.NewMetricsCollector(100) // буфер на 100 батчей
 
+	var runCancel context.CancelFunc
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			// Горутина для сбора runtime метрик
-			go func() {
-				ticker := time.NewTicker(time.Second * time.Duration(flags.FlagPollInterval))
-				defer ticker.Stop()
+			runCtx, cancel := context.WithCancel(context.Background())
+			runCancel = cancel
 
+			pollInterval := time.Duration(cfg.PollInterval) * time.Second
+			reportInterval := time.Duration(cfg.ReportPollInterval) * time.Second
+
+			go func() {
+				ticker := time.NewTicker(pollInterval)
+				defer ticker.Stop()
 				for {
 					select {
-					case <-ctx.Done():
+					case <-runCtx.Done():
 						return
 					case <-ticker.C:
 						collector.CollectRuntimeMetrics()
@@ -31,14 +36,12 @@ func MetricsCollectorProvider(lc fx.Lifecycle) *metrics.MetricsCollector {
 				}
 			}()
 
-			// Горутина для сбора gopsutil метрик
 			go func() {
-				ticker := time.NewTicker(time.Second * time.Duration(flags.FlagPollInterval))
+				ticker := time.NewTicker(pollInterval)
 				defer ticker.Stop()
-
 				for {
 					select {
-					case <-ctx.Done():
+					case <-runCtx.Done():
 						return
 					case <-ticker.C:
 						collector.CollectGopsutilMetrics()
@@ -46,14 +49,12 @@ func MetricsCollectorProvider(lc fx.Lifecycle) *metrics.MetricsCollector {
 				}
 			}()
 
-			// Горутина для отправки метрик в канал
 			go func() {
-				ticker := time.NewTicker(time.Second * time.Duration(flags.FlagReportPollInterval))
+				ticker := time.NewTicker(reportInterval)
 				defer ticker.Stop()
-
 				for {
 					select {
-					case <-ctx.Done():
+					case <-runCtx.Done():
 						return
 					case <-ticker.C:
 						collector.SendMetrics()
@@ -64,6 +65,9 @@ func MetricsCollectorProvider(lc fx.Lifecycle) *metrics.MetricsCollector {
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
+			if runCancel != nil {
+				runCancel()
+			}
 			return nil
 		},
 	})
@@ -84,25 +88,32 @@ func HTTPClientProvider(lc fx.Lifecycle) *http.Client {
 }
 
 // WorkerPoolProvider создает и запускает пул воркеров
-func WorkerPoolProvider(lc fx.Lifecycle, collector *metrics.MetricsCollector, client *http.Client) *metrics.WorkerPool {
-	rateLimit := flags.FlagRateLimit
+func WorkerPoolProvider(lc fx.Lifecycle, cfg *flags.AgentConfig, collector *metrics.MetricsCollector, client *http.Client) *metrics.WorkerPool {
+	rateLimit := cfg.RateLimit
 	if rateLimit < 1 {
 		rateLimit = 1
 	}
 
 	pool := metrics.NewWorkerPool(
 		client,
-		flags.FlagMetricsServer,
+		cfg.MetricsServer,
+		cfg.Key,
 		rateLimit,
 		collector.GetMetricsChan(),
 	)
 
+	var runCancel context.CancelFunc
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			pool.Start(ctx)
+			runCtx, cancel := context.WithCancel(context.Background())
+			runCancel = cancel
+			pool.Start(runCtx)
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
+			if runCancel != nil {
+				runCancel()
+			}
 			pool.Stop()
 			return nil
 		},
@@ -112,10 +123,9 @@ func WorkerPoolProvider(lc fx.Lifecycle, collector *metrics.MetricsCollector, cl
 }
 
 func main() {
-	flags.ParseFlags()
-
 	fx.New(
 		fx.Provide(
+			flags.NewAgentConfig,
 			MetricsCollectorProvider,
 			HTTPClientProvider,
 			WorkerPoolProvider,

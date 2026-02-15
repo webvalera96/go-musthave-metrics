@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/webvalera96/go-musthave-metrics/internal/agent/flags"
 	"github.com/webvalera96/go-musthave-metrics/internal/hash"
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
 	"github.com/webvalera96/go-musthave-metrics/internal/retry"
@@ -143,6 +142,7 @@ func sendMetric(
 func sendMetricsBatch(
 	client *http.Client,
 	baseURL string,
+	hashKey string,
 	metrics []models.Metrics,
 ) error {
 	requestURL := fmt.Sprintf("http://%s/updates/", baseURL)
@@ -166,9 +166,8 @@ func sendMetricsBatch(
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("Content-Encoding", "gzip")
 
-		// Добавляем хеш заголовок, если ключ задан
-		if flags.FlagKey != "" {
-			hashValue := hash.CalculateHash(compressedBody, flags.FlagKey)
+		if hashKey != "" {
+			hashValue := hash.CalculateHash(compressedBody, hashKey)
 			request.Header.Set("HashSHA256", hashValue)
 		}
 
@@ -236,8 +235,8 @@ func (rm *RuntimeMetrics) SendToMetricsStorage(client *http.Client) error {
 		Value: &rm.RandomValue,
 	})
 
-	// send all metrics in one batch
-	return sendMetricsBatch(client, flags.FlagMetricsServer, metricsBatch)
+	// send all metrics in one batch (baseURL and hashKey передаются извне при вызове SendToMetricsStorage)
+	return sendMetricsBatch(client, "", "", metricsBatch)
 }
 
 //func sendMetric(client *http.Client, baseURL string, metricType string, metricName string, metricValue string) error {

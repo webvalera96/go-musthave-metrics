@@ -28,11 +28,9 @@ import (
 const timeout time.Duration = time.Duration(30)
 
 func main() {
-
-	flags.ParseFlags()
-
 	fx.New(
 		fx.Provide(
+			flags.NewServerConfig,
 			repository.CreateMemoryMetricsStorage,
 			NewHTTPServer,
 			NewSugaredLogger,
@@ -106,26 +104,22 @@ func NewChiMux(
 	return r
 }
 
-func Restore(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage, db *sql.DB) {
+func Restore(lc fx.Lifecycle, cfg *flags.ServerConfig, ms *repository.MemoryMetricsStorage, db *sql.DB) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-
-			if flags.FlagRestore {
-				// Приоритет: DATABASE_DSN > FILE_STORAGE_PATH > память
-				if flags.FlagDatabaseDSN != "" {
+			if cfg.Restore {
+				if cfg.DatabaseDSN != "" {
 					err := ms.LoadDB(db, timeout)
 					if err != nil {
 						return err
 					}
-				} else if flags.FlagStoragePath != "" {
-					err := ms.Load(flags.FlagStoragePath)
+				} else if cfg.StoragePath != "" {
+					err := ms.Load(cfg.StoragePath)
 					if err != nil {
 						return err
 					}
 				}
-				// Если оба пустые - используем память, ничего не загружаем
 			}
-
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
@@ -140,9 +134,9 @@ func Restore(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage, db *sql.DB) {
 	})
 }
 
-func NewDatabase() (*sql.DB, error) {
-	if flags.FlagDatabaseDSN != "" {
-		db, err := sql.Open("postgres", flags.FlagDatabaseDSN)
+func NewDatabase(cfg *flags.ServerConfig) (*sql.DB, error) {
+	if cfg.DatabaseDSN != "" {
+		db, err := sql.Open("postgres", cfg.DatabaseDSN)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open database: %w", err)
 		}
@@ -182,10 +176,9 @@ func NewSugaredLogger() (*zap.SugaredLogger, error) {
 	return &sugar, nil
 }
 
-// NewAuditSubject создаёт субъект аудита с приёмниками по флагам (файл и/или URL).
-// Если оба параметра пусты, приёмников не будет — аудит отключён.
-func NewAuditSubject() *audit.Subject {
-	return audit.NewSubjectFromConfig(flags.FlagAuditFile, flags.FlagAuditURL)
+// NewAuditSubject создаёт субъект аудита с приёмниками по конфигу (файл и/или URL).
+func NewAuditSubject(cfg *flags.ServerConfig) *audit.Subject {
+	return audit.NewSubjectFromConfig(cfg.AuditFile, cfg.AuditURL)
 }
 
 // StartPprofServer запускает HTTP-сервер для pprof на localhost:6060 (heap, goroutine, allocs и т.д.).
@@ -200,36 +193,28 @@ func StartPprofServer(lc fx.Lifecycle) {
 	})
 }
 
-func SetupSyncSave(lc fx.Lifecycle, ms *repository.MemoryMetricsStorage, db *sql.DB, srv *http.Server) {
+func SetupSyncSave(lc fx.Lifecycle, cfg *flags.ServerConfig, ms *repository.MemoryMetricsStorage, db *sql.DB, srv *http.Server) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			// Настраиваем синхронное сохранение, если STORE_INTERVAL == 0
-			// Зависимость от *http.Server гарантирует, что это выполнится после создания сервера,
-			// но до того, как сервер начнет обрабатывать запросы (так как сервер запускается в OnStart)
-			if flags.FlagStoreInterval == 0 {
-				if flags.FlagDatabaseDSN != "" {
+			if cfg.StoreInterval == 0 {
+				if cfg.DatabaseDSN != "" {
 					ms.SetSyncSaveConfig(db, "", timeout, true)
-				} else if flags.FlagStoragePath != "" {
-					ms.SetSyncSaveConfig(nil, flags.FlagStoragePath, timeout, true)
+				} else if cfg.StoragePath != "" {
+					ms.SetSyncSaveConfig(nil, cfg.StoragePath, timeout, true)
 				}
-				// Если оба пустые - используем память, синхронное сохранение не нужно
 			}
-			_ = srv // используем параметр, чтобы создать зависимость
+			_ = srv
 			return nil
 		},
 	})
 }
 
-func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux, ms *repository.MemoryMetricsStorage, db *sql.DB) *http.Server {
-	// Порядок middleware важен:
-	// 1. HashVerifyMiddleware - проверяет хеш от сжатого тела запроса (до gzip распаковки)
-	// 2. GzipHandle - распаковывает gzip в запросах и сжимает ответы
-	// 3. HashResponseMiddleware - добавляет хеш в ответы (от сжатого тела, если gzip применен)
-	// HashResponseMiddleware должен быть внутри GzipHandle, чтобы перехватывать сжатый вывод
-	handlerChain := handler.HashVerifyMiddleware(
-		handler.GzipHandleWithHash(mux),
+func NewHTTPServer(lc fx.Lifecycle, cfg *flags.ServerConfig, mux *chi.Mux, ms *repository.MemoryMetricsStorage, db *sql.DB) *http.Server {
+	handlerChain := handler.HashVerifyMiddleware(cfg.Key,
+		handler.ResponseEncoding(mux, cfg.Key),
 	)
-	srv := &http.Server{Addr: flags.FlagRunAddr, Handler: handlerChain}
+	srv := &http.Server{Addr: cfg.RunAddr, Handler: handlerChain}
+	var reconcileCancel context.CancelFunc
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			ln, err := net.Listen("tcp", srv.Addr)
@@ -239,25 +224,23 @@ func NewHTTPServer(lc fx.Lifecycle, mux *chi.Mux, ms *repository.MemoryMetricsSt
 			fmt.Println("Starting HTTP serve at", srv.Addr)
 			go srv.Serve(ln)
 
-			// Приоритет: DATABASE_DSN > FILE_STORAGE_PATH > память
-			duration := time.Duration(flags.FlagStoreInterval)
-
-			// Асинхронное сохранение - запускаем периодическое сохранение только если STORE_INTERVAL > 0
+			duration := time.Duration(cfg.StoreInterval)
 			if duration > 0 {
-				if flags.FlagDatabaseDSN != "" {
-					// Используем БД
-					go ms.ReconcileDB(ctx, duration, db, timeout)
-				} else if flags.FlagStoragePath != "" {
-					// Используем файл
-					go ms.Reconcile(ctx, duration, flags.FlagStoragePath)
+				runCtx, cancel := context.WithCancel(context.Background())
+				reconcileCancel = cancel
+				if cfg.DatabaseDSN != "" {
+					go ms.ReconcileDB(runCtx, duration, db, timeout)
+				} else if cfg.StoragePath != "" {
+					go ms.Reconcile(runCtx, duration, cfg.StoragePath)
 				}
-				// Если оба пустые - используем память, периодическое сохранение не запускаем
 			}
-			// Если duration == 0, синхронное сохранение уже настроено в SetupSyncSave
 
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
+			if reconcileCancel != nil {
+				reconcileCancel()
+			}
 			return srv.Shutdown(ctx)
 		},
 	})
