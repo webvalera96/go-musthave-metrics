@@ -144,19 +144,19 @@ func NewDatabase(cfg *flags.ServerConfig) (*sql.DB, error) {
 		// Создадим необходимые таблицы в базе данных
 		driver, err := postgres.WithInstance(db, &postgres.Config{})
 		if err != nil {
-			db.Close()
+			_ = db.Close()
 			return nil, fmt.Errorf("failed to create postgres driver: %w", err)
 		}
 		m, err := migrate.NewWithDatabaseInstance(
 			"file://migrations",
 			"postgres", driver)
 		if err != nil {
-			db.Close()
+			_ = db.Close()
 			return nil, fmt.Errorf("failed to create migrate instance: %w", err)
 		}
 		err = m.Migrate(1) // or m.Steps(2) if you want to explicitly set the number of migrations to run
 		if err != nil && !errors.Is(err, migrate.ErrNoChange) {
-			db.Close()
+			_ = db.Close()
 			return nil, fmt.Errorf("failed to run migrations: %w", err)
 		}
 		return db, nil
@@ -222,7 +222,11 @@ func NewHTTPServer(lc fx.Lifecycle, cfg *flags.ServerConfig, mux *chi.Mux, ms *r
 				return err
 			}
 			fmt.Println("Starting HTTP serve at", srv.Addr)
-			go srv.Serve(ln)
+			go func() {
+				if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+					fmt.Printf("HTTP server error: %v\n", err)
+				}
+			}()
 
 			duration := time.Duration(cfg.StoreInterval)
 			if duration > 0 {
