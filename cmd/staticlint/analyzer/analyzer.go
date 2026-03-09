@@ -38,7 +38,6 @@ import (
 	"golang.org/x/tools/go/analysis/passes/unreachable"
 	"golang.org/x/tools/go/analysis/passes/unsafeptr"
 	"golang.org/x/tools/go/analysis/passes/unusedresult"
-	"honnef.co/go/tools/staticcheck"
 )
 
 // GetAnalyzers возвращает список всех анализаторов для multichecker
@@ -75,21 +74,6 @@ func GetAnalyzers() []*analysis.Analyzer {
 		// Дополнительные анализаторы
 		errcheck.Analyzer,
 		ineffassign.Analyzer,
-	}
-
-	// Добавляем все анализаторы класса SA из staticcheck
-	for _, v := range staticcheck.Analyzers {
-		// Фильтруем только анализаторы класса SA
-		if len(v.Analyzer.Name) >= 2 && v.Analyzer.Name[:2] == "SA" {
-			analyzers = append(analyzers, v.Analyzer)
-		}
-	}
-
-	// Добавляем анализаторы других классов staticcheck (ST - стиль кода)
-	for _, v := range staticcheck.Analyzers {
-		if len(v.Analyzer.Name) >= 2 && v.Analyzer.Name[:2] == "ST" {
-			analyzers = append(analyzers, v.Analyzer)
-		}
 	}
 
 	return analyzers
