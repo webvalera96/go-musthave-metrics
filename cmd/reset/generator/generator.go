@@ -205,7 +205,7 @@ func generateFieldReset(field *FieldInfo) string {
 	if field.Type.IsPointer {
 		// Указатель
 		sb.WriteString(fmt.Sprintf("\tif %s != nil {\n", fieldName))
-		
+
 		// Определяем внутренний тип (без указателя)
 		innerBaseType := strings.TrimPrefix(field.Type.ElementType, "*")
 		innerType := FieldType{
@@ -232,7 +232,7 @@ func generateFieldReset(field *FieldInfo) string {
 			zeroValue := getZeroValue(innerType.BaseType)
 			sb.WriteString(fmt.Sprintf("\t\t*%s = %s\n", fieldName, zeroValue))
 		}
-		
+
 		sb.WriteString("\t}\n")
 	} else if field.Type.IsSlice {
 		// Слайс
@@ -275,7 +275,7 @@ func getStructNameFromType(typeStr string) string {
 func getZeroValue(typeStr string) string {
 	// Убираем указатели для определения базового типа
 	baseType := strings.TrimPrefix(typeStr, "*")
-	
+
 	switch baseType {
 	case "int", "int8", "int16", "int32", "int64",
 		"uint", "uint8", "uint16", "uint32", "uint64",
