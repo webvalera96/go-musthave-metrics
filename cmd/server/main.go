@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	_ "net/http/pprof" // регистрация /debug/pprof для профилирования
@@ -27,7 +28,14 @@ import (
 
 const timeout time.Duration = time.Duration(30)
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	printBuildInfo()
 	fx.New(
 		fx.Provide(
 			flags.NewServerConfig,
@@ -51,6 +59,26 @@ func main() {
 			func(*http.Server) {},
 		),
 	).Run()
+}
+
+// printBuildInfo выводит информацию о версии сборки в stdout
+func printBuildInfo() {
+	version := buildVersion
+	if version == "" {
+		version = "N/A"
+	}
+	date := buildDate
+	if date == "" {
+		date = "N/A"
+	}
+	commit := buildCommit
+	if commit == "" {
+		commit = "N/A"
+	}
+
+	fmt.Fprintf(os.Stdout, "Build version: %s\n", version)
+	fmt.Fprintf(os.Stdout, "Build date: %s\n", date)
+	fmt.Fprintf(os.Stdout, "Build commit: %s\n", commit)
 }
 
 func NewChiMux(

@@ -2,12 +2,20 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/flags"
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/metrics"
 	"go.uber.org/fx"
+)
+
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
 )
 
 // MetricsCollectorProvider создает коллектор метрик
@@ -123,6 +131,7 @@ func WorkerPoolProvider(lc fx.Lifecycle, cfg *flags.AgentConfig, collector *metr
 }
 
 func main() {
+	printBuildInfo()
 	fx.New(
 		fx.Provide(
 			flags.NewAgentConfig,
@@ -132,4 +141,24 @@ func main() {
 		),
 		fx.Invoke(func(*metrics.WorkerPool) {}),
 	).Run()
+}
+
+// printBuildInfo выводит информацию о версии сборки в stdout
+func printBuildInfo() {
+	version := buildVersion
+	if version == "" {
+		version = "N/A"
+	}
+	date := buildDate
+	if date == "" {
+		date = "N/A"
+	}
+	commit := buildCommit
+	if commit == "" {
+		commit = "N/A"
+	}
+
+	fmt.Fprintf(os.Stdout, "Build version: %s\n", version)
+	fmt.Fprintf(os.Stdout, "Build date: %s\n", date)
+	fmt.Fprintf(os.Stdout, "Build commit: %s\n", commit)
 }
