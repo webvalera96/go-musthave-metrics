@@ -209,12 +209,10 @@ func generateFieldReset(field *FieldInfo) string {
 		// Определяем внутренний тип (без указателя)
 		innerBaseType := strings.TrimPrefix(field.Type.ElementType, "*")
 		innerType := FieldType{
-			BaseType:    innerBaseType,
-			IsPointer:   false,
-			IsSlice:     strings.HasPrefix(innerBaseType, "[]"),
-			IsMap:       strings.HasPrefix(innerBaseType, "map["),
-			IsStruct:    field.Type.IsStruct || isStructTypeName(innerBaseType),
-			ElementType: innerBaseType,
+			BaseType: innerBaseType,
+			IsSlice:  strings.HasPrefix(innerBaseType, "[]"),
+			IsMap:    strings.HasPrefix(innerBaseType, "map["),
+			IsStruct: field.Type.IsStruct || isStructTypeName(innerBaseType),
 		}
 
 		if innerType.IsSlice {
@@ -225,10 +223,10 @@ func generateFieldReset(field *FieldInfo) string {
 			// Для указателя на структуру вызываем Reset() если есть, иначе создаем новую структуру
 			structName := getStructNameFromType(innerType.BaseType)
 			sb.WriteString(fmt.Sprintf("\t\tif resetter, ok := interface{}(%s).(interface{ Reset() }); ok {\n", fieldName))
-			sb.WriteString(fmt.Sprintf("\t\t\tresetter.Reset()\n"))
-			sb.WriteString(fmt.Sprintf("\t\t} else {\n"))
+			sb.WriteString("\t\t\tresetter.Reset()\n")
+			sb.WriteString("\t\t} else {\n")
 			sb.WriteString(fmt.Sprintf("\t\t\t*%s = %s{}\n", fieldName, structName))
-			sb.WriteString(fmt.Sprintf("\t\t}\n"))
+			sb.WriteString("\t\t}\n")
 		} else {
 			// Примитивный тип
 			zeroValue := getZeroValue(innerType.BaseType)
@@ -246,10 +244,10 @@ func generateFieldReset(field *FieldInfo) string {
 		// Структура - вызываем Reset() если есть, иначе создаем новую структуру
 		structName := getStructNameFromType(field.Type.BaseType)
 		sb.WriteString(fmt.Sprintf("\tif resetter, ok := interface{}(&%s).(interface{ Reset() }); ok {\n", fieldName))
-		sb.WriteString(fmt.Sprintf("\t\tresetter.Reset()\n"))
-		sb.WriteString(fmt.Sprintf("\t} else {\n"))
+		sb.WriteString("\t\tresetter.Reset()\n")
+		sb.WriteString("\t} else {\n")
 		sb.WriteString(fmt.Sprintf("\t\t%s = %s{}\n", fieldName, structName))
-		sb.WriteString(fmt.Sprintf("\t}\n"))
+		sb.WriteString("\t}\n")
 	} else {
 		// Примитивный тип
 		zeroValue := getZeroValue(field.Type.BaseType)
