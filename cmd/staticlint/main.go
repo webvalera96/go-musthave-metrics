@@ -2,9 +2,9 @@ package main
 
 import (
 	"github.com/webvalera96/go-musthave-metrics/cmd/staticlint/analyzer"
-	"golang.org/x/tools/go/analysis/multichecker"
+	"golang.org/x/tools/go/analysis/singlechecker"
 )
 
 func main() {
-	multichecker.Main(analyzer.GetAnalyzers()...)
+	singlechecker.Main(analyzer.Analyzer)
 }

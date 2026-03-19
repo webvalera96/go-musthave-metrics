@@ -2,76 +2,72 @@ package analyzer
 
 import (
 	"go/ast"
+	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 )
 
-// ExitCheckAnalyzer проверяет, что в функции main пакета main не используется прямой вызов os.Exit.
-//
-// Этот анализатор помогает обеспечить правильное завершение программы через возврат из main
-// или использование других механизмов завершения (например, через fx.Run() или graceful shutdown),
-// что важно для корректной работы тестов и интеграции с системами управления процессами.
+// ExitCheckAnalyzer запрещает:
+// - panic — везде
+// - os.Exit и log.Fatal — везде, кроме функции main пакета main
 var ExitCheckAnalyzer = &analysis.Analyzer{
 	Name: "exitcheck",
-	Doc:  "запрещает прямой вызов os.Exit в функции main пакета main",
+	Doc:  "запрещает panic везде, а os.Exit/log.Fatal — везде кроме main.main",
 	Run:  runExitCheck,
 }
 
 func runExitCheck(pass *analysis.Pass) (interface{}, error) {
-	// Проверяем, что мы в пакете main
-	if pass.Pkg.Name() != "main" {
-		return nil, nil
-	}
-
 	for _, file := range pass.Files {
-		// Проверяем импорт os
-		hasOSImport := false
-		for _, imp := range file.Imports {
-			if imp.Path.Value == `"os"` {
-				hasOSImport = true
-				break
-			}
-		}
-
-		if !hasOSImport {
-			continue
-		}
-
-		// Ищем функцию main
-		ast.Inspect(file, func(n ast.Node) bool {
-			fn, ok := n.(*ast.FuncDecl)
-			if !ok || fn.Name.Name != "main" {
-				return true
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
 			}
 
-			// Проверяем вызовы os.Exit в теле функции main
+			isMainFunc := pass.Pkg != nil &&
+				pass.Pkg.Name() == "main" &&
+				fn.Recv == nil &&
+				fn.Name != nil &&
+				fn.Name.Name == "main"
+
 			ast.Inspect(fn.Body, func(n ast.Node) bool {
 				call, ok := n.(*ast.CallExpr)
 				if !ok {
 					return true
 				}
 
-				// Проверяем, является ли это вызовом os.Exit
+				// panic(...) запрещен везде
+				if ident, ok := call.Fun.(*ast.Ident); ok && ident.Name == "panic" {
+					pass.Reportf(call.Pos(), "вызов panic запрещен")
+					return true
+				}
+
+				// os.Exit / log.Fatal запрещены везде, кроме main.main
 				sel, ok := call.Fun.(*ast.SelectorExpr)
-				if !ok {
+				if !ok || sel.Sel == nil {
 					return true
 				}
 
-				ident, ok := sel.X.(*ast.Ident)
-				if !ok {
+				obj := pass.TypesInfo.Uses[sel.Sel]
+				fnObj, ok := obj.(*types.Func)
+				if !ok || fnObj.Pkg() == nil {
 					return true
 				}
 
-				// Проверяем, что это os.Exit
-				if ident.Name == "os" && sel.Sel.Name == "Exit" {
-					pass.Reportf(call.Pos(), "прямой вызов os.Exit в функции main пакета main запрещен")
+				switch fnObj.Pkg().Path() {
+				case "os":
+					if fnObj.Name() == "Exit" && !isMainFunc {
+						pass.Reportf(call.Pos(), "вызов os.Exit запрещен вне main.main")
+					}
+				case "log":
+					if fnObj.Name() == "Fatal" && !isMainFunc {
+						pass.Reportf(call.Pos(), "вызов log.Fatal запрещен вне main.main")
+					}
 				}
 
 				return true
 			})
-
-			return true
-		})
+		}
 	}
 
 	return nil, nil
