@@ -9,6 +9,19 @@ import (
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
 )
 
+// SetCancelRun сохраняет cancel для контекста воркеров (вызывается из fx OnStart).
+func (wp *WorkerPool) SetCancelRun(cancel context.CancelFunc) {
+	wp.cancelRun = cancel
+}
+
+// Shutdown отменяет контекст воркеров и ждёт завершения (включая отправку оставшихся батчей).
+func (wp *WorkerPool) Shutdown() {
+	if wp.cancelRun != nil {
+		wp.cancelRun()
+	}
+	wp.wg.Wait()
+}
+
 // WorkerPool управляет пулом воркеров для отправки метрик
 type WorkerPool struct {
 	client      *http.Client
@@ -17,6 +30,7 @@ type WorkerPool struct {
 	publicKey   *rsa.PublicKey
 	workers     int
 	metricsChan <-chan []models.Metrics
+	cancelRun   context.CancelFunc
 	wg          sync.WaitGroup
 }
 
@@ -40,11 +54,6 @@ func (wp *WorkerPool) Start(ctx context.Context) {
 	}
 }
 
-// Stop останавливает пул воркеров
-func (wp *WorkerPool) Stop() {
-	wp.wg.Wait()
-}
-
 // worker обрабатывает метрики из канала
 func (wp *WorkerPool) worker(ctx context.Context, id int) {
 	defer wp.wg.Done()
@@ -52,18 +61,30 @@ func (wp *WorkerPool) worker(ctx context.Context, id int) {
 	for {
 		select {
 		case <-ctx.Done():
+			wp.drainAndSend()
 			return
 		case metrics, ok := <-wp.metricsChan:
 			if !ok {
 				return
 			}
-			// Отправляем метрики
 			err := sendMetricsBatch(wp.client, wp.baseURL, wp.hashKey, wp.publicKey, metrics)
 			if err != nil {
-				// Логируем ошибку, но продолжаем работу
 				continue
 			}
 		}
 	}
 }
 
+func (wp *WorkerPool) drainAndSend() {
+	for {
+		select {
+		case metrics, ok := <-wp.metricsChan:
+			if !ok {
+				return
+			}
+			_ = sendMetricsBatch(wp.client, wp.baseURL, wp.hashKey, wp.publicKey, metrics)
+		default:
+			return
+		}
+	}
+}

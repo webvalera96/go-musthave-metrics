@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"time"
 
 	_ "net/http/pprof" // регистрация /debug/pprof для профилирования
@@ -24,6 +25,7 @@ import (
 	"github.com/webvalera96/go-musthave-metrics/internal/handler/log"
 	"github.com/webvalera96/go-musthave-metrics/internal/repository"
 	"github.com/webvalera96/go-musthave-metrics/internal/securepayload"
+	"github.com/webvalera96/go-musthave-metrics/internal/shutdown"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -36,14 +38,22 @@ var (
 	buildCommit  string
 )
 
+// httpserverBundle держит сервер и отмену фонового reconcile для корректного shutdown.
+type httpserverBundle struct {
+	Server          *http.Server
+	ReconcileCancel context.CancelFunc
+}
+
 func main() {
 	printBuildInfo()
-	fx.New(
+	app := fx.New(
+		fx.StopTimeout(30*time.Second),
 		fx.Provide(
 			flags.NewServerConfig,
 			CryptoPrivateKey,
 			repository.CreateMemoryMetricsStorage,
 			NewHTTPServer,
+			ProvideHTTPServer,
 			NewSugaredLogger,
 			NewChiMux,
 			NewDatabase,
@@ -60,8 +70,51 @@ func main() {
 			SetupSyncSave,
 			StartPprofServer,
 			func(*http.Server) {},
+			GracefulServerShutdown,
 		),
-	).Run()
+	)
+
+	startCtx, cancel := context.WithTimeout(context.Background(), app.StartTimeout())
+	defer cancel()
+	if err := app.Start(startCtx); err != nil {
+		os.Exit(1)
+	}
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, shutdown.Signals()...)
+	<-sigCh
+
+	stopCtx, cancelStop := context.WithTimeout(context.Background(), app.StopTimeout())
+	defer cancelStop()
+	if err := app.Stop(stopCtx); err != nil {
+		os.Exit(1)
+	}
+}
+
+// ProvideHTTPServer отдаёт *http.Server для зависимостей (SetupSyncSave и т.д.).
+func ProvideHTTPServer(b *httpserverBundle) *http.Server {
+	return b.Server
+}
+
+// GracefulServerShutdown: остановка HTTP, reconcile, сброс на диск/БД, закрытие БД.
+func GracefulServerShutdown(lc fx.Lifecycle, bundle *httpserverBundle, ms *repository.MemoryMetricsStorage, db *sql.DB) {
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			if err := bundle.Server.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				return err
+			}
+			if bundle.ReconcileCancel != nil {
+				bundle.ReconcileCancel()
+			}
+			if err := ms.FlushPersistence(); err != nil {
+				return err
+			}
+			if db != nil {
+				return db.Close()
+			}
+			return nil
+		},
+	})
 }
 
 // printBuildInfo выводит информацию о версии сборки в stdout
@@ -153,15 +206,6 @@ func Restore(lc fx.Lifecycle, cfg *flags.ServerConfig, ms *repository.MemoryMetr
 			}
 			return nil
 		},
-		OnStop: func(ctx context.Context) error {
-			if db != nil {
-				err := db.Close()
-				if err != nil {
-					return err
-				}
-			}
-			return nil
-		},
 	})
 }
 
@@ -248,14 +292,14 @@ func SetupSyncSave(lc fx.Lifecycle, cfg *flags.ServerConfig, ms *repository.Memo
 	})
 }
 
-func NewHTTPServer(lc fx.Lifecycle, cfg *flags.ServerConfig, mux *chi.Mux, ms *repository.MemoryMetricsStorage, db *sql.DB, priv *rsa.PrivateKey) *http.Server {
+func NewHTTPServer(lc fx.Lifecycle, cfg *flags.ServerConfig, mux *chi.Mux, ms *repository.MemoryMetricsStorage, db *sql.DB, priv *rsa.PrivateKey) *httpserverBundle {
 	handlerChain := handler.DecryptRequestMiddleware(priv,
 		handler.HashVerifyMiddleware(cfg.Key,
 			handler.ResponseEncoding(mux, cfg.Key),
 		),
 	)
 	srv := &http.Server{Addr: cfg.RunAddr, Handler: handlerChain}
-	var reconcileCancel context.CancelFunc
+	bundle := &httpserverBundle{Server: srv}
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			ln, err := net.Listen("tcp", srv.Addr)
@@ -272,7 +316,7 @@ func NewHTTPServer(lc fx.Lifecycle, cfg *flags.ServerConfig, mux *chi.Mux, ms *r
 			duration := time.Duration(cfg.StoreInterval)
 			if duration > 0 {
 				runCtx, cancel := context.WithCancel(context.Background())
-				reconcileCancel = cancel
+				bundle.ReconcileCancel = cancel
 				if cfg.DatabaseDSN != "" {
 					go ms.ReconcileDB(runCtx, duration, db, timeout)
 				} else if cfg.StoragePath != "" {
@@ -282,12 +326,6 @@ func NewHTTPServer(lc fx.Lifecycle, cfg *flags.ServerConfig, mux *chi.Mux, ms *r
 
 			return nil
 		},
-		OnStop: func(ctx context.Context) error {
-			if reconcileCancel != nil {
-				reconcileCancel()
-			}
-			return srv.Shutdown(ctx)
-		},
 	})
-	return srv
+	return bundle
 }

@@ -1,11 +1,13 @@
 package metrics
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"runtime"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -14,10 +16,32 @@ import (
 
 // MetricsCollector собирает метрики и отправляет их в канал
 type MetricsCollector struct {
-	metricsChan    chan []models.Metrics
-	mu             sync.Mutex
-	runtimeData    RuntimeMetrics
+	metricsChan     chan []models.Metrics
+	mu              sync.Mutex
+	runtimeData     RuntimeMetrics
 	gopsutilMetrics []models.Metrics
+	stopPollers     context.CancelFunc
+}
+
+// SetStopPollers задаёт отмену горутин опроса (вызывается из fx OnStart).
+func (mc *MetricsCollector) SetStopPollers(cancel context.CancelFunc) {
+	mc.stopPollers = cancel
+}
+
+// StopPollers останавливает сбор метрик (тикеры).
+func (mc *MetricsCollector) StopPollers() {
+	if mc.stopPollers != nil {
+		mc.stopPollers()
+	}
+}
+
+// FlushMetricsToChannel блокирующе кладёт последний батч в очередь (graceful shutdown).
+func (mc *MetricsCollector) FlushMetricsToChannel() {
+	batch := mc.BuildMetricsBatch()
+	select {
+	case mc.metricsChan <- batch:
+	case <-time.After(30 * time.Second):
+	}
 }
 
 // NewMetricsCollector создает новый коллектор метрик
@@ -152,4 +176,3 @@ func (mc *MetricsCollector) SendMetrics() {
 		// Канал переполнен, пропускаем отправку
 	}
 }
-

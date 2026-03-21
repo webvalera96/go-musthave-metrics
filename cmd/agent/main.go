@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"time"
 
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/flags"
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/metrics"
 	"github.com/webvalera96/go-musthave-metrics/internal/securepayload"
+	"github.com/webvalera96/go-musthave-metrics/internal/shutdown"
 	"go.uber.org/fx"
 )
 
@@ -22,13 +24,12 @@ var (
 
 // MetricsCollectorProvider создает коллектор метрик
 func MetricsCollectorProvider(lc fx.Lifecycle, cfg *flags.AgentConfig) *metrics.MetricsCollector {
-	collector := metrics.NewMetricsCollector(100) // буфер на 100 батчей
+	collector := metrics.NewMetricsCollector(100)
 
-	var runCancel context.CancelFunc
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			runCtx, cancel := context.WithCancel(context.Background())
-			runCancel = cancel
+			collector.SetStopPollers(cancel)
 
 			pollInterval := time.Duration(cfg.PollInterval) * time.Second
 			reportInterval := time.Duration(cfg.ReportPollInterval) * time.Second
@@ -74,12 +75,6 @@ func MetricsCollectorProvider(lc fx.Lifecycle, cfg *flags.AgentConfig) *metrics.
 
 			return nil
 		},
-		OnStop: func(ctx context.Context) error {
-			if runCancel != nil {
-				runCancel()
-			}
-			return nil
-		},
 	})
 
 	return collector
@@ -121,19 +116,11 @@ func WorkerPoolProvider(lc fx.Lifecycle, cfg *flags.AgentConfig, collector *metr
 		collector.GetMetricsChan(),
 	)
 
-	var runCancel context.CancelFunc
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			runCtx, cancel := context.WithCancel(context.Background())
-			runCancel = cancel
+			pool.SetCancelRun(cancel)
 			pool.Start(runCtx)
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			if runCancel != nil {
-				runCancel()
-			}
-			pool.Stop()
 			return nil
 		},
 	})
@@ -141,9 +128,22 @@ func WorkerPoolProvider(lc fx.Lifecycle, cfg *flags.AgentConfig, collector *metr
 	return pool
 }
 
+// AgentGracefulShutdown останавливает опрос, досылает батчи воркерам и ждёт отправки.
+func AgentGracefulShutdown(lc fx.Lifecycle, col *metrics.MetricsCollector, pool *metrics.WorkerPool) {
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			col.StopPollers()
+			col.FlushMetricsToChannel()
+			pool.Shutdown()
+			return nil
+		},
+	})
+}
+
 func main() {
 	printBuildInfo()
-	fx.New(
+	app := fx.New(
+		fx.StopTimeout(30*time.Second),
 		fx.Provide(
 			flags.NewAgentConfig,
 			CryptoPublicKey,
@@ -152,7 +152,24 @@ func main() {
 			WorkerPoolProvider,
 		),
 		fx.Invoke(func(*metrics.WorkerPool) {}),
-	).Run()
+		fx.Invoke(AgentGracefulShutdown),
+	)
+
+	startCtx, cancel := context.WithTimeout(context.Background(), app.StartTimeout())
+	defer cancel()
+	if err := app.Start(startCtx); err != nil {
+		os.Exit(1)
+	}
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, shutdown.Signals()...)
+	<-sigCh
+
+	stopCtx, cancelStop := context.WithTimeout(context.Background(), app.StopTimeout())
+	defer cancelStop()
+	if err := app.Stop(stopCtx); err != nil {
+		os.Exit(1)
+	}
 }
 
 // printBuildInfo выводит информацию о версии сборки в stdout

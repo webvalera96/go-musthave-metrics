@@ -136,6 +136,23 @@ func (ms *MemoryMetricsStorage) SaveDB(db *sql.DB, timeout time.Duration) error 
 	return nil
 }
 
+// FlushPersistence сохраняет все метрики в файл или БД (если настроено). Для graceful shutdown.
+func (ms *MemoryMetricsStorage) FlushPersistence() error {
+	ms.mu.Lock()
+	db := ms.db
+	path := ms.fileStoragePath
+	timeout := ms.timeout
+	ms.mu.Unlock()
+
+	if db != nil {
+		return ms.SaveDB(db, timeout)
+	}
+	if path != "" {
+		return ms.Save(path)
+	}
+	return nil
+}
+
 func (ms *MemoryMetricsStorage) Save(fileStoragePath string) error {
 	ms.Lock()
 	defer ms.Unlock()
