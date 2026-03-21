@@ -14,6 +14,7 @@ type AgentConfig struct {
 	ReportPollInterval  int
 	Key                 string
 	RateLimit           int
+	CryptoKey           string
 }
 
 // NewAgentConfig парсит флаги и env и возвращает конфиг. Вызывать до flag.Parse() не нужно — парсинг внутри.
@@ -51,6 +52,7 @@ func NewAgentConfig() *AgentConfig {
 	}
 
 	flag.StringVar(&cfg.Key, "k", "", "hash key for signing requests")
+	flag.StringVar(&cfg.CryptoKey, "crypto-key", "", "path to PEM file with RSA public key for request encryption")
 	flag.IntVar(&cfg.RateLimit, "l", 1, "rate limit for concurrent requests")
 	flag.Parse()
 
@@ -63,6 +65,9 @@ func NewAgentConfig() *AgentConfig {
 		if err != nil {
 			log.Fatal("unable to parse RATE_LIMIT env value")
 		}
+	}
+	if v, exist := os.LookupEnv(EnvCryptoKey); exist {
+		cfg.CryptoKey = v
 	}
 
 	return cfg

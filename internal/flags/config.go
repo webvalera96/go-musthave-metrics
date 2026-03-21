@@ -15,6 +15,7 @@ type ServerConfig struct {
 	Restore       bool
 	DatabaseDSN   string
 	Key           string
+	CryptoKey     string
 	AuditFile     string
 	AuditURL      string
 }
@@ -35,6 +36,7 @@ func NewServerConfig() *ServerConfig {
 	flag.BoolVar(&cfg.Restore, "r", false, "restore from file or database")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "database DSN")
 	flag.StringVar(&cfg.Key, "k", "", "hash key for signing requests and responses")
+	flag.StringVar(&cfg.CryptoKey, "crypto-key", "", "path to PEM file with RSA private key for decrypting agent requests")
 	flag.StringVar(&cfg.AuditFile, "audit-file", "", "path to file for audit logs")
 	flag.StringVar(&cfg.AuditURL, "audit-url", "", "full URL to send audit logs via POST")
 	flag.Parse()
@@ -64,6 +66,9 @@ func NewServerConfig() *ServerConfig {
 	}
 	if v, exist := os.LookupEnv(EnvKey); exist {
 		cfg.Key = v
+	}
+	if v, exist := os.LookupEnv(EnvCryptoKey); exist {
+		cfg.CryptoKey = v
 	}
 	if v, exist := os.LookupEnv(EnvAuditFile); exist {
 		cfg.AuditFile = v

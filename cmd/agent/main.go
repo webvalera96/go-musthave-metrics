@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
 	"net/http"
 	"os"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/flags"
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/metrics"
+	"github.com/webvalera96/go-musthave-metrics/internal/securepayload"
 	"go.uber.org/fx"
 )
 
@@ -95,8 +97,16 @@ func HTTPClientProvider(lc fx.Lifecycle) *http.Client {
 	return client
 }
 
+// CryptoPublicKey загружает RSA-публичный ключ из пути в конфиге (если путь задан).
+func CryptoPublicKey(cfg *flags.AgentConfig) (*rsa.PublicKey, error) {
+	if cfg.CryptoKey == "" {
+		return nil, nil
+	}
+	return securepayload.LoadPublicKey(cfg.CryptoKey)
+}
+
 // WorkerPoolProvider создает и запускает пул воркеров
-func WorkerPoolProvider(lc fx.Lifecycle, cfg *flags.AgentConfig, collector *metrics.MetricsCollector, client *http.Client) *metrics.WorkerPool {
+func WorkerPoolProvider(lc fx.Lifecycle, cfg *flags.AgentConfig, collector *metrics.MetricsCollector, client *http.Client, pub *rsa.PublicKey) *metrics.WorkerPool {
 	rateLimit := cfg.RateLimit
 	if rateLimit < 1 {
 		rateLimit = 1
@@ -106,6 +116,7 @@ func WorkerPoolProvider(lc fx.Lifecycle, cfg *flags.AgentConfig, collector *metr
 		client,
 		cfg.MetricsServer,
 		cfg.Key,
+		pub,
 		rateLimit,
 		collector.GetMetricsChan(),
 	)
@@ -135,6 +146,7 @@ func main() {
 	fx.New(
 		fx.Provide(
 			flags.NewAgentConfig,
+			CryptoPublicKey,
 			MetricsCollectorProvider,
 			HTTPClientProvider,
 			WorkerPoolProvider,

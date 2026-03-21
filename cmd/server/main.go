@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	"github.com/webvalera96/go-musthave-metrics/internal/handler"
 	"github.com/webvalera96/go-musthave-metrics/internal/handler/log"
 	"github.com/webvalera96/go-musthave-metrics/internal/repository"
+	"github.com/webvalera96/go-musthave-metrics/internal/securepayload"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -39,6 +41,7 @@ func main() {
 	fx.New(
 		fx.Provide(
 			flags.NewServerConfig,
+			CryptoPrivateKey,
 			repository.CreateMemoryMetricsStorage,
 			NewHTTPServer,
 			NewSugaredLogger,
@@ -209,6 +212,14 @@ func NewAuditSubject(cfg *flags.ServerConfig) *audit.Subject {
 	return audit.NewSubjectFromConfig(cfg.AuditFile, cfg.AuditURL)
 }
 
+// CryptoPrivateKey загружает RSA-приватный ключ из пути в конфиге (если путь задан).
+func CryptoPrivateKey(cfg *flags.ServerConfig) (*rsa.PrivateKey, error) {
+	if cfg.CryptoKey == "" {
+		return nil, nil
+	}
+	return securepayload.LoadPrivateKey(cfg.CryptoKey)
+}
+
 // StartPprofServer запускает HTTP-сервер для pprof на localhost:6060 (heap, goroutine, allocs и т.д.).
 func StartPprofServer(lc fx.Lifecycle) {
 	lc.Append(fx.Hook{
@@ -237,9 +248,11 @@ func SetupSyncSave(lc fx.Lifecycle, cfg *flags.ServerConfig, ms *repository.Memo
 	})
 }
 
-func NewHTTPServer(lc fx.Lifecycle, cfg *flags.ServerConfig, mux *chi.Mux, ms *repository.MemoryMetricsStorage, db *sql.DB) *http.Server {
-	handlerChain := handler.HashVerifyMiddleware(cfg.Key,
-		handler.ResponseEncoding(mux, cfg.Key),
+func NewHTTPServer(lc fx.Lifecycle, cfg *flags.ServerConfig, mux *chi.Mux, ms *repository.MemoryMetricsStorage, db *sql.DB, priv *rsa.PrivateKey) *http.Server {
+	handlerChain := handler.DecryptRequestMiddleware(priv,
+		handler.HashVerifyMiddleware(cfg.Key,
+			handler.ResponseEncoding(mux, cfg.Key),
+		),
 	)
 	srv := &http.Server{Addr: cfg.RunAddr, Handler: handlerChain}
 	var reconcileCancel context.CancelFunc

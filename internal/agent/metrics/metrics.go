@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"github.com/webvalera96/go-musthave-metrics/internal/hash"
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
 	"github.com/webvalera96/go-musthave-metrics/internal/retry"
+	"github.com/webvalera96/go-musthave-metrics/internal/securepayload"
 	"github.com/webvalera96/go-musthave-metrics/internal/zip"
 )
 
@@ -143,6 +145,7 @@ func sendMetricsBatch(
 	client *http.Client,
 	baseURL string,
 	hashKey string,
+	pubKey *rsa.PublicKey,
 	metrics []models.Metrics,
 ) error {
 	requestURL := fmt.Sprintf("http://%s/updates/", baseURL)
@@ -157,14 +160,25 @@ func sendMetricsBatch(
 		return err
 	}
 
+	payload := compressedBody
+	if pubKey != nil {
+		payload, err = securepayload.Encrypt(pubKey, compressedBody)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Используем retry логику для обработки временных ошибок соединения
 	err = retry.Retry(func() error {
-		request, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(compressedBody))
+		request, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(payload))
 		if err != nil {
 			return err
 		}
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("Content-Encoding", "gzip")
+		if pubKey != nil {
+			request.Header.Set(securepayload.HTTPHeaderEncrypted, "1")
+		}
 
 		if hashKey != "" {
 			hashValue := hash.CalculateHash(compressedBody, hashKey)
@@ -236,7 +250,7 @@ func (rm *RuntimeMetrics) SendToMetricsStorage(client *http.Client) error {
 	})
 
 	// send all metrics in one batch (baseURL and hashKey передаются извне при вызове SendToMetricsStorage)
-	return sendMetricsBatch(client, "", "", metricsBatch)
+	return sendMetricsBatch(client, "", "", nil, metricsBatch)
 }
 
 //func sendMetric(client *http.Client, baseURL string, metricType string, metricName string, metricValue string) error {

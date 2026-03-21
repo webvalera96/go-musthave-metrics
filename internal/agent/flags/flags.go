@@ -7,4 +7,5 @@ const (
 	EnvPollInterval   = "POLL_INTERVAL"
 	EnvKey            = "KEY"
 	EnvRateLimit      = "RATE_LIMIT"
+	EnvCryptoKey      = "CRYPTO_KEY"
 )
