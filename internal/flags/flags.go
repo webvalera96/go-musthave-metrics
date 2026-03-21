@@ -11,4 +11,5 @@ const (
 	EnvAuditFile       = "AUDIT_FILE"
 	EnvAuditURL        = "AUDIT_URL"
 	EnvCryptoKey       = "CRYPTO_KEY"
+	EnvConfig          = "CONFIG"
 )

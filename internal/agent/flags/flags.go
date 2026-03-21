@@ -8,4 +8,5 @@ const (
 	EnvKey            = "KEY"
 	EnvRateLimit      = "RATE_LIMIT"
 	EnvCryptoKey      = "CRYPTO_KEY"
+	EnvConfig         = "CONFIG"
 )

@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"strconv"
+
+	"github.com/webvalera96/go-musthave-metrics/internal/configfile"
 )
 
 // ServerConfig — конфигурация сервера (флаги и переменные окружения), передаётся через DI.
@@ -20,26 +22,47 @@ type ServerConfig struct {
 	AuditURL      string
 }
 
-// NewServerConfig парсит флаги и env и возвращает конфиг.
+// NewServerConfig парсит JSON (низший приоритет), затем флаги, затем env (высший приоритет).
 func NewServerConfig() *ServerConfig {
-	cfg := &ServerConfig{}
+	cfg := &ServerConfig{
+		RunAddr:       ":8080",
+		StoreInterval: 300,
+		StoragePath:   "",
+		Restore:       false,
+		DatabaseDSN:   "",
+		Key:           "",
+		CryptoKey:     "",
+		AuditFile:     "",
+		AuditURL:      "",
+	}
+
+	if p := configfile.ResolvePath(); p != "" {
+		s, err := configfile.LoadServer(p)
+		if err != nil {
+			log.Fatalf("server config file: %v", err)
+		}
+		if err := applyServerFile(cfg, s); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	flag.StringVar(&cfg.RunAddr, "a", cfg.RunAddr, "address and port to run server")
+	flag.IntVar(&cfg.StoreInterval, "i", cfg.StoreInterval, "time interval to save data on disk")
+	flag.StringVar(&cfg.StoragePath, "f", cfg.StoragePath, "path to saved data in file")
+	flag.BoolVar(&cfg.Restore, "r", cfg.Restore, "restore from file or database")
+	flag.StringVar(&cfg.DatabaseDSN, "d", cfg.DatabaseDSN, "database DSN")
+	flag.StringVar(&cfg.Key, "k", cfg.Key, "hash key for signing requests and responses")
+	flag.StringVar(&cfg.CryptoKey, "crypto-key", cfg.CryptoKey, "path to PEM file with RSA private key for decrypting agent requests")
+	flag.StringVar(&cfg.AuditFile, "audit-file", cfg.AuditFile, "path to file for audit logs")
+	flag.StringVar(&cfg.AuditURL, "audit-url", cfg.AuditURL, "full URL to send audit logs via POST")
+
+	_ = flag.CommandLine.Parse(configfile.FilterArgs(os.Args)[1:])
 
 	runAddr, runAddrEnv := os.LookupEnv(EnvAddress)
 	storeIntervalStr, storeIntervalEnv := os.LookupEnv(EnvStoreInterval)
 	fileStoragePath, fileStoragePathEnv := os.LookupEnv(EnvFileStoragePath)
 	restoreStr, restoreEnv := os.LookupEnv(EnvRestore)
 	databaseDSN, databaseDSNEnv := os.LookupEnv(EnvDatabaseDSN)
-
-	flag.StringVar(&cfg.RunAddr, "a", ":8080", "address and port to run server")
-	flag.IntVar(&cfg.StoreInterval, "i", 300, "time interval to save data on disk")
-	flag.StringVar(&cfg.StoragePath, "f", "", "path to saved data in file")
-	flag.BoolVar(&cfg.Restore, "r", false, "restore from file or database")
-	flag.StringVar(&cfg.DatabaseDSN, "d", "", "database DSN")
-	flag.StringVar(&cfg.Key, "k", "", "hash key for signing requests and responses")
-	flag.StringVar(&cfg.CryptoKey, "crypto-key", "", "path to PEM file with RSA private key for decrypting agent requests")
-	flag.StringVar(&cfg.AuditFile, "audit-file", "", "path to file for audit logs")
-	flag.StringVar(&cfg.AuditURL, "audit-url", "", "full URL to send audit logs via POST")
-	flag.Parse()
 
 	if runAddrEnv {
 		cfg.RunAddr = runAddr
@@ -78,4 +101,42 @@ func NewServerConfig() *ServerConfig {
 	}
 
 	return cfg
+}
+
+func applyServerFile(cfg *ServerConfig, s *configfile.Server) error {
+	if s == nil {
+		return nil
+	}
+	if s.Address != nil {
+		cfg.RunAddr = *s.Address
+	}
+	if s.Restore != nil {
+		cfg.Restore = *s.Restore
+	}
+	sec, ok, err := configfile.ApplyServerIntervalSeconds(s)
+	if err != nil {
+		return err
+	}
+	if ok {
+		cfg.StoreInterval = sec
+	}
+	if s.StoreFile != nil {
+		cfg.StoragePath = *s.StoreFile
+	}
+	if s.DatabaseDSN != nil {
+		cfg.DatabaseDSN = *s.DatabaseDSN
+	}
+	if s.CryptoKey != nil {
+		cfg.CryptoKey = *s.CryptoKey
+	}
+	if s.Key != nil {
+		cfg.Key = *s.Key
+	}
+	if s.AuditFile != nil {
+		cfg.AuditFile = *s.AuditFile
+	}
+	if s.AuditURL != nil {
+		cfg.AuditURL = *s.AuditURL
+	}
+	return nil
 }
