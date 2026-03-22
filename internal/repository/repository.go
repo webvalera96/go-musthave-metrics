@@ -107,7 +107,7 @@ func (ms *MemoryMetricsStorage) LoadDB(db *sql.DB, timeout time.Duration) error 
 	ms.Lock()
 	defer ms.Unlock()
 
-	metrics, err := models.ReadDB(db, timeout)
+	metrics, err := LoadMetricsFromDB(db, timeout)
 	if err != nil {
 		return err
 	}
@@ -127,8 +127,7 @@ func (ms *MemoryMetricsStorage) SaveDB(db *sql.DB, timeout time.Duration) error 
 	defer ms.Unlock()
 
 	for _, metric := range ms.data {
-		_, err := metric.SaveDB(db, timeout)
-		if err != nil {
+		if err := UpsertMetricInDB(db, metric, timeout); err != nil {
 			return err
 		}
 	}

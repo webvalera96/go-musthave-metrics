@@ -30,7 +30,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const timeout time.Duration = time.Duration(30)
+const timeout = 30 * time.Second
 
 var (
 	buildVersion string
