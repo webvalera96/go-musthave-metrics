@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/webvalera96/go-musthave-metrics/internal/agent/localip"
+	"github.com/webvalera96/go-musthave-metrics/internal/handler"
 	"github.com/webvalera96/go-musthave-metrics/internal/hash"
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
 	"github.com/webvalera96/go-musthave-metrics/internal/retry"
@@ -126,6 +128,7 @@ func sendMetric(
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Content-Encoding", "gzip")
+	request.Header.Set(handler.XRealIPHeader, localip.Host())
 
 	response, err := client.Do(request)
 	if err != nil {
@@ -146,6 +149,7 @@ func sendMetricsBatch(
 	baseURL string,
 	hashKey string,
 	pubKey *rsa.PublicKey,
+	hostIP string,
 	metrics []models.Metrics,
 ) error {
 	requestURL := fmt.Sprintf("http://%s/updates/", baseURL)
@@ -183,6 +187,9 @@ func sendMetricsBatch(
 		if hashKey != "" {
 			hashValue := hash.CalculateHash(compressedBody, hashKey)
 			request.Header.Set("HashSHA256", hashValue)
+		}
+		if hostIP != "" {
+			request.Header.Set(handler.XRealIPHeader, hostIP)
 		}
 
 		response, err := client.Do(request)
@@ -250,7 +257,7 @@ func (rm *RuntimeMetrics) SendToMetricsStorage(client *http.Client) error {
 	})
 
 	// send all metrics in one batch (baseURL and hashKey передаются извне при вызове SendToMetricsStorage)
-	return sendMetricsBatch(client, "", "", nil, metricsBatch)
+	return sendMetricsBatch(client, "", "", nil, localip.Host(), metricsBatch)
 }
 
 //func sendMetric(client *http.Client, baseURL string, metricType string, metricName string, metricValue string) error {

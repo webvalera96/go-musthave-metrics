@@ -85,6 +85,7 @@ type Server struct {
 	Key           *string `json:"key,omitempty"`
 	AuditFile     *string `json:"audit_file,omitempty"`
 	AuditURL      *string `json:"audit_url,omitempty"`
+	TrustedSubnet *string `json:"trusted_subnet,omitempty"`
 }
 
 // LoadServer читает JSON (приоритет ниже, чем у флагов и env).

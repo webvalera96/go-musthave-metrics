@@ -12,4 +12,5 @@ const (
 	EnvAuditURL        = "AUDIT_URL"
 	EnvCryptoKey       = "CRYPTO_KEY"
 	EnvConfig          = "CONFIG"
+	EnvTrustedSubnet   = "TRUSTED_SUBNET"
 )

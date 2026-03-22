@@ -28,19 +28,21 @@ type WorkerPool struct {
 	baseURL     string
 	hashKey     string
 	publicKey   *rsa.PublicKey
+	hostIP      string
 	workers     int
 	metricsChan <-chan []models.Metrics
 	cancelRun   context.CancelFunc
 	wg          sync.WaitGroup
 }
 
-// NewWorkerPool создает новый пул воркеров
-func NewWorkerPool(client *http.Client, baseURL string, hashKey string, publicKey *rsa.PublicKey, workers int, metricsChan <-chan []models.Metrics) *WorkerPool {
+// NewWorkerPool создает новый пул воркеров. hostIP — для заголовка X-Real-IP.
+func NewWorkerPool(client *http.Client, baseURL string, hashKey string, publicKey *rsa.PublicKey, hostIP string, workers int, metricsChan <-chan []models.Metrics) *WorkerPool {
 	return &WorkerPool{
 		client:      client,
 		baseURL:     baseURL,
 		hashKey:     hashKey,
 		publicKey:   publicKey,
+		hostIP:      hostIP,
 		workers:     workers,
 		metricsChan: metricsChan,
 	}
@@ -67,7 +69,7 @@ func (wp *WorkerPool) worker(ctx context.Context, id int) {
 			if !ok {
 				return
 			}
-			err := sendMetricsBatch(wp.client, wp.baseURL, wp.hashKey, wp.publicKey, metrics)
+			err := sendMetricsBatch(wp.client, wp.baseURL, wp.hashKey, wp.publicKey, wp.hostIP, metrics)
 			if err != nil {
 				continue
 			}
@@ -82,7 +84,7 @@ func (wp *WorkerPool) drainAndSend() {
 			if !ok {
 				return
 			}
-			_ = sendMetricsBatch(wp.client, wp.baseURL, wp.hashKey, wp.publicKey, metrics)
+			_ = sendMetricsBatch(wp.client, wp.baseURL, wp.hashKey, wp.publicKey, wp.hostIP, metrics)
 		default:
 			return
 		}

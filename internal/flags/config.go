@@ -20,6 +20,7 @@ type ServerConfig struct {
 	CryptoKey     string
 	AuditFile     string
 	AuditURL      string
+	TrustedSubnet string
 }
 
 // NewServerConfig парсит JSON (низший приоритет), затем флаги, затем env (высший приоритет).
@@ -34,6 +35,7 @@ func NewServerConfig() *ServerConfig {
 		CryptoKey:     "",
 		AuditFile:     "",
 		AuditURL:      "",
+		TrustedSubnet: "",
 	}
 
 	if p := configfile.ResolvePath(); p != "" {
@@ -55,6 +57,7 @@ func NewServerConfig() *ServerConfig {
 	flag.StringVar(&cfg.CryptoKey, "crypto-key", cfg.CryptoKey, "path to PEM file with RSA private key for decrypting agent requests")
 	flag.StringVar(&cfg.AuditFile, "audit-file", cfg.AuditFile, "path to file for audit logs")
 	flag.StringVar(&cfg.AuditURL, "audit-url", cfg.AuditURL, "full URL to send audit logs via POST")
+	flag.StringVar(&cfg.TrustedSubnet, "t", cfg.TrustedSubnet, "trusted CIDR for agent X-Real-IP (empty = no check)")
 
 	_ = flag.CommandLine.Parse(configfile.FilterArgs(os.Args)[1:])
 
@@ -99,6 +102,9 @@ func NewServerConfig() *ServerConfig {
 	if v, exist := os.LookupEnv(EnvAuditURL); exist {
 		cfg.AuditURL = v
 	}
+	if v, exist := os.LookupEnv(EnvTrustedSubnet); exist {
+		cfg.TrustedSubnet = v
+	}
 
 	return cfg
 }
@@ -137,6 +143,9 @@ func applyServerFile(cfg *ServerConfig, s *configfile.Server) error {
 	}
 	if s.AuditURL != nil {
 		cfg.AuditURL = *s.AuditURL
+	}
+	if s.TrustedSubnet != nil {
+		cfg.TrustedSubnet = *s.TrustedSubnet
 	}
 	return nil
 }

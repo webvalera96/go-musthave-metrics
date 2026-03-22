@@ -292,10 +292,21 @@ func SetupSyncSave(lc fx.Lifecycle, cfg *flags.ServerConfig, ms *repository.Memo
 	})
 }
 
-func NewHTTPServer(lc fx.Lifecycle, cfg *flags.ServerConfig, mux *chi.Mux, ms *repository.MemoryMetricsStorage, db *sql.DB, priv *rsa.PrivateKey) *httpserverBundle {
-	handlerChain := handler.DecryptRequestMiddleware(priv,
-		handler.HashVerifyMiddleware(cfg.Key,
-			handler.ResponseEncoding(mux, cfg.Key),
+func NewHTTPServer(lc fx.Lifecycle, cfg *flags.ServerConfig, mux *chi.Mux, ms *repository.MemoryMetricsStorage, db *sql.DB, priv *rsa.PrivateKey) (*httpserverBundle, error) {
+	var trustedNet *net.IPNet
+	if cfg.TrustedSubnet != "" {
+		_, n, err := net.ParseCIDR(cfg.TrustedSubnet)
+		if err != nil {
+			return nil, fmt.Errorf("invalid trusted_subnet: %w", err)
+		}
+		trustedNet = n
+	}
+
+	handlerChain := handler.TrustedSubnetMiddleware(trustedNet,
+		handler.DecryptRequestMiddleware(priv,
+			handler.HashVerifyMiddleware(cfg.Key,
+				handler.ResponseEncoding(mux, cfg.Key),
+			),
 		),
 	)
 	srv := &http.Server{Addr: cfg.RunAddr, Handler: handlerChain}
@@ -327,5 +338,5 @@ func NewHTTPServer(lc fx.Lifecycle, cfg *flags.ServerConfig, mux *chi.Mux, ms *r
 			return nil
 		},
 	})
-	return bundle
+	return bundle, nil
 }

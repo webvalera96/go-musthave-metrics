@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/flags"
+	"github.com/webvalera96/go-musthave-metrics/internal/agent/localip"
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/metrics"
 	"github.com/webvalera96/go-musthave-metrics/internal/securepayload"
 	"github.com/webvalera96/go-musthave-metrics/internal/shutdown"
@@ -112,6 +113,7 @@ func WorkerPoolProvider(lc fx.Lifecycle, cfg *flags.AgentConfig, collector *metr
 		cfg.MetricsServer,
 		cfg.Key,
 		pub,
+		localip.Host(),
 		rateLimit,
 		collector.GetMetricsChan(),
 	)
