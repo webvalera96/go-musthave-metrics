@@ -37,6 +37,13 @@ git fetch template && git checkout template/v2 .github
 
 Это лишь пример организации кода, который поможет вам в реализации сервиса.
 
+## gRPC (метрики)
+
+Протокол описан в [`internal/proto/metrics/metrics.proto`](internal/proto/metrics/metrics.proto). Сгенерированный код: `internal/proto/metrics/*.pb.go` (перегенерация: `go generate` в каталоге `internal/proto/metrics` при установленном `protoc`).
+
+- **Сервер**: флаг `-grpc` и переменная окружения `GRPC_ADDRESS` — адрес прослушивания gRPC (пусто = gRPC не поднимается). Сервис `Metrics.UpdateMetrics` принимает батч метрик. Проверка подсети: те же `TRUSTED_SUBNET` / `-t`, что и для HTTP; IP агента ожидается в метаданных `x-real-ip`, иначе `PermissionDenied`.
+- **Агент**: флаг `-grpc` и `GRPC_ADDRESS` — адрес gRPC-сервера. Если задано, метрики отправляются батчем через `UpdateMetricsRequest`; иначе используется прежний HTTP `POST /updates/`. В метаданные запроса добавляется `x-real-ip` (локальный IP хоста).
+
 При необходимости можно вносить изменения в структуру проекта, использовать любые библиотеки и предпочитаемые структурные паттерны организации кода приложения, например:
 - **DDD** (Domain-Driven Design)
 - **Clean Architecture**
