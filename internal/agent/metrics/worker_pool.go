@@ -74,7 +74,7 @@ func (wp *WorkerPool) worker(ctx context.Context, id int) {
 			if !ok {
 				return
 			}
-			err := wp.sendBatch(metrics)
+			err := wp.sendBatch(ctx, metrics)
 			if err != nil {
 				continue
 			}
@@ -89,17 +89,19 @@ func (wp *WorkerPool) drainAndSend() {
 			if !ok {
 				return
 			}
-			_ = wp.sendBatch(metrics)
+			// ctx уже отменён при дрене — используем фоновый контекст, чтобы не обрывать
+			// последние отправки при graceful shutdown (отмена влияет на in-flight до выхода из цикла).
+			_ = wp.sendBatch(context.Background(), metrics)
 		default:
 			return
 		}
 	}
 }
 
-func (wp *WorkerPool) sendBatch(metrics []models.Metrics) error {
+func (wp *WorkerPool) sendBatch(ctx context.Context, metrics []models.Metrics) error {
 	if wp.grpcClient != nil {
 		return retry.Retry(func() error {
-			return sendMetricsBatchGRPC(context.Background(), wp.grpcClient, wp.hostIP, metrics)
+			return sendMetricsBatchGRPC(ctx, wp.grpcClient, wp.hostIP, metrics)
 		})
 	}
 	return retry.Retry(func() error {

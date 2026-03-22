@@ -326,14 +326,15 @@ func NewHTTPServer(lc fx.Lifecycle, cfg *flags.ServerConfig, mux *chi.Mux, ms *r
 				}
 			}()
 
-			duration := time.Duration(cfg.StoreInterval)
-			if duration > 0 {
+			// StoreInterval в конфиге — секунды; явно переводим в time.Duration.
+			reconcileInterval := time.Duration(cfg.StoreInterval) * time.Second
+			if reconcileInterval > 0 {
 				runCtx, cancel := context.WithCancel(context.Background())
 				bundle.ReconcileCancel = cancel
 				if cfg.DatabaseDSN != "" {
-					go ms.ReconcileDB(runCtx, duration, db, timeout)
+					go ms.ReconcileDB(runCtx, reconcileInterval, db, timeout)
 				} else if cfg.StoragePath != "" {
-					go ms.Reconcile(runCtx, duration, cfg.StoragePath)
+					go ms.Reconcile(runCtx, reconcileInterval, cfg.StoragePath)
 				}
 			}
 

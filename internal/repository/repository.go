@@ -32,13 +32,15 @@ func (ms *MemoryMetricsStorage) Unlock() {
 	ms.mu.Unlock()
 }
 
-// runPeriodicTask выполняет задачу периодически с использованием ticker
-// Останавливается при отмене контекста
-func runPeriodicTask(ctx context.Context, duration time.Duration, task func() error, errorMsg string) {
-	if duration == 0 {
+// runPeriodicTask выполняет задачу каждые interval.
+// interval — уже готовый time.Duration (например 5*time.Minute или time.Duration(n)*time.Second);
+// не передавайте «сырые секунды» как int без явного умножения на time.Second.
+// Останавливается при отмене контекста.
+func runPeriodicTask(ctx context.Context, interval time.Duration, task func() error, errorMsg string) {
+	if interval <= 0 {
 		return
 	}
-	ticker := time.NewTicker(duration * time.Second)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -54,17 +56,19 @@ func runPeriodicTask(ctx context.Context, duration time.Duration, task func() er
 	}
 }
 
-func (ms *MemoryMetricsStorage) Reconcile(ctx context.Context, duration time.Duration, fileStoragePath string) {
-	// Если duration == 0, синхронное сохранение уже настроено в Set()
-	runPeriodicTask(ctx, duration, func() error {
+// Reconcile периодически сохраняет метрики в файл. interval — период между сохранениями (time.Duration).
+func (ms *MemoryMetricsStorage) Reconcile(ctx context.Context, interval time.Duration, fileStoragePath string) {
+	// Если interval == 0, синхронное сохранение уже настроено в Set()
+	runPeriodicTask(ctx, interval, func() error {
 		return ms.Save(fileStoragePath)
 	}, "error saving metrics to file "+fileStoragePath)
 }
 
-func (ms *MemoryMetricsStorage) ReconcileDB(ctx context.Context, duration time.Duration,
+// ReconcileDB периодически сохраняет метрики в БД. interval — период между сохранениями (time.Duration).
+func (ms *MemoryMetricsStorage) ReconcileDB(ctx context.Context, interval time.Duration,
 	db *sql.DB, timeout time.Duration) {
-	// Если duration == 0, синхронное сохранение уже настроено в Set()
-	runPeriodicTask(ctx, duration, func() error {
+	// Если interval == 0, синхронное сохранение уже настроено в Set()
+	runPeriodicTask(ctx, interval, func() error {
 		return ms.SaveDB(db, timeout)
 	}, "error saving metrics to database")
 }
