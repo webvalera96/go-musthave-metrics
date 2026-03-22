@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"bytes"
+	"context"
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
@@ -19,9 +20,10 @@ import (
 	"github.com/webvalera96/go-musthave-metrics/internal/handler"
 	"github.com/webvalera96/go-musthave-metrics/internal/hash"
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
-	"github.com/webvalera96/go-musthave-metrics/internal/retry"
+	pb "github.com/webvalera96/go-musthave-metrics/internal/proto/metrics"
 	"github.com/webvalera96/go-musthave-metrics/internal/securepayload"
 	"github.com/webvalera96/go-musthave-metrics/internal/zip"
+	"google.golang.org/grpc/metadata"
 )
 
 var MemoryMetrics = []string{
@@ -172,40 +174,73 @@ func sendMetricsBatch(
 		}
 	}
 
-	// Используем retry логику для обработки временных ошибок соединения
-	err = retry.Retry(func() error {
-		request, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(payload))
+	request, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Encoding", "gzip")
+	if pubKey != nil {
+		request.Header.Set(securepayload.HTTPHeaderEncrypted, "1")
+	}
+
+	if hashKey != "" {
+		hashValue := hash.CalculateHash(compressedBody, hashKey)
+		request.Header.Set("HashSHA256", hashValue)
+	}
+	if hostIP != "" {
+		request.Header.Set(handler.XRealIPHeader, hostIP)
+	}
+
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("[%s] unable to send metrics batch, status: %d", time.Now().Format(time.RFC3339), response.StatusCode)
+	}
+	fmt.Printf("[%s] %s is ok (sent %d metrics)\n", time.Now().Format(time.RFC3339), requestURL, len(metrics))
+	return nil
+}
+
+func sendMetricsBatchGRPC(
+	ctx context.Context,
+	client pb.MetricsClient,
+	hostIP string,
+	metrics []models.Metrics,
+) error {
+	req := &pb.UpdateMetricsRequest{
+		Metrics: make([]*pb.Metric, 0, len(metrics)),
+	}
+	for i := range metrics {
+		pm, err := modelToProtoMetric(&metrics[i])
 		if err != nil {
 			return err
 		}
-		request.Header.Set("Content-Type", "application/json")
-		request.Header.Set("Content-Encoding", "gzip")
-		if pubKey != nil {
-			request.Header.Set(securepayload.HTTPHeaderEncrypted, "1")
-		}
-
-		if hashKey != "" {
-			hashValue := hash.CalculateHash(compressedBody, hashKey)
-			request.Header.Set("HashSHA256", hashValue)
-		}
-		if hostIP != "" {
-			request.Header.Set(handler.XRealIPHeader, hostIP)
-		}
-
-		response, err := client.Do(request)
-		if err != nil {
-			return err
-		}
-		defer response.Body.Close()
-		if response.StatusCode != http.StatusOK {
-			// Не retriable ошибка - не повторяем
-			return fmt.Errorf("[%s] unable to send metrics batch, status: %d", time.Now().Format(time.RFC3339), response.StatusCode)
-		}
-		fmt.Printf("[%s] %s is ok (sent %d metrics)\n", time.Now().Format(time.RFC3339), requestURL, len(metrics))
-		return nil
-	})
-
+		req.Metrics = append(req.Metrics, pm)
+	}
+	md := metadata.Pairs(handler.XRealIPMetadataKey, hostIP)
+	outCtx := metadata.NewOutgoingContext(ctx, md)
+	_, err := client.UpdateMetrics(outCtx, req)
 	return err
+}
+
+func modelToProtoMetric(m *models.Metrics) (*pb.Metric, error) {
+	switch m.MType {
+	case models.Counter:
+		if m.Delta == nil {
+			return nil, fmt.Errorf("counter %s: delta is nil", m.ID)
+		}
+		return &pb.Metric{Id: m.ID, Type: pb.Metric_COUNTER, Delta: *m.Delta}, nil
+	case models.Gauge:
+		if m.Value == nil {
+			return nil, fmt.Errorf("gauge %s: value is nil", m.ID)
+		}
+		return &pb.Metric{Id: m.ID, Type: pb.Metric_GAUGE, Value: *m.Value}, nil
+	default:
+		return nil, fmt.Errorf("unknown metric type %s", m.MType)
+	}
 }
 
 func (rm *RuntimeMetrics) SendToMetricsStorage(client *http.Client) error {

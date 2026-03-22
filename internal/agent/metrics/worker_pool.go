@@ -7,6 +7,8 @@ import (
 	"sync"
 
 	models "github.com/webvalera96/go-musthave-metrics/internal/model"
+	pb "github.com/webvalera96/go-musthave-metrics/internal/proto/metrics"
+	"github.com/webvalera96/go-musthave-metrics/internal/retry"
 )
 
 // SetCancelRun сохраняет cancel для контекста воркеров (вызывается из fx OnStart).
@@ -28,6 +30,7 @@ type WorkerPool struct {
 	baseURL     string
 	hashKey     string
 	publicKey   *rsa.PublicKey
+	grpcClient  pb.MetricsClient
 	hostIP      string
 	workers     int
 	metricsChan <-chan []models.Metrics
@@ -35,13 +38,15 @@ type WorkerPool struct {
 	wg          sync.WaitGroup
 }
 
-// NewWorkerPool создает новый пул воркеров. hostIP — для заголовка X-Real-IP.
-func NewWorkerPool(client *http.Client, baseURL string, hashKey string, publicKey *rsa.PublicKey, hostIP string, workers int, metricsChan <-chan []models.Metrics) *WorkerPool {
+// NewWorkerPool создает новый пул воркеров. hostIP — для заголовка X-Real-IP / метаданных x-real-ip.
+// Если grpcClient != nil, метрики отправляются по gRPC (батч UpdateMetricsRequest); иначе — HTTP /updates/.
+func NewWorkerPool(client *http.Client, baseURL string, hashKey string, publicKey *rsa.PublicKey, grpcClient pb.MetricsClient, hostIP string, workers int, metricsChan <-chan []models.Metrics) *WorkerPool {
 	return &WorkerPool{
 		client:      client,
 		baseURL:     baseURL,
 		hashKey:     hashKey,
 		publicKey:   publicKey,
+		grpcClient:  grpcClient,
 		hostIP:      hostIP,
 		workers:     workers,
 		metricsChan: metricsChan,
@@ -69,7 +74,7 @@ func (wp *WorkerPool) worker(ctx context.Context, id int) {
 			if !ok {
 				return
 			}
-			err := sendMetricsBatch(wp.client, wp.baseURL, wp.hashKey, wp.publicKey, wp.hostIP, metrics)
+			err := wp.sendBatch(metrics)
 			if err != nil {
 				continue
 			}
@@ -84,9 +89,20 @@ func (wp *WorkerPool) drainAndSend() {
 			if !ok {
 				return
 			}
-			_ = sendMetricsBatch(wp.client, wp.baseURL, wp.hashKey, wp.publicKey, wp.hostIP, metrics)
+			_ = wp.sendBatch(metrics)
 		default:
 			return
 		}
 	}
+}
+
+func (wp *WorkerPool) sendBatch(metrics []models.Metrics) error {
+	if wp.grpcClient != nil {
+		return retry.Retry(func() error {
+			return sendMetricsBatchGRPC(context.Background(), wp.grpcClient, wp.hostIP, metrics)
+		})
+	}
+	return retry.Retry(func() error {
+		return sendMetricsBatch(wp.client, wp.baseURL, wp.hashKey, wp.publicKey, wp.hostIP, metrics)
+	})
 }

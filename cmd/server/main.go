@@ -21,6 +21,7 @@ import (
 	_ "github.com/lib/pq" // PostgresSQL driver
 	"github.com/webvalera96/go-musthave-metrics/internal/audit"
 	"github.com/webvalera96/go-musthave-metrics/internal/flags"
+	"github.com/webvalera96/go-musthave-metrics/internal/grpcserver"
 	"github.com/webvalera96/go-musthave-metrics/internal/handler"
 	"github.com/webvalera96/go-musthave-metrics/internal/handler/log"
 	"github.com/webvalera96/go-musthave-metrics/internal/repository"
@@ -69,6 +70,7 @@ func main() {
 			Restore,
 			SetupSyncSave,
 			StartPprofServer,
+			grpcserver.RegisterGRPC,
 			func(*http.Server) {},
 			GracefulServerShutdown,
 		),

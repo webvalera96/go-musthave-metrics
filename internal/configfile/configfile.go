@@ -86,6 +86,7 @@ type Server struct {
 	AuditFile     *string `json:"audit_file,omitempty"`
 	AuditURL      *string `json:"audit_url,omitempty"`
 	TrustedSubnet *string `json:"trusted_subnet,omitempty"`
+	GRPCAddr      *string `json:"grpc_address,omitempty"`
 }
 
 // LoadServer читает JSON (приоритет ниже, чем у флагов и env).
@@ -121,6 +122,7 @@ type Agent struct {
 	CryptoKey      *string `json:"crypto_key,omitempty"`
 	Key            *string `json:"key,omitempty"`
 	RateLimit      *int    `json:"rate_limit,omitempty"`
+	GRPCAddr       *string `json:"grpc_address,omitempty"`
 }
 
 // LoadAgent читает JSON.

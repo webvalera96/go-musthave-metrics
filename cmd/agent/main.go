@@ -12,9 +12,12 @@ import (
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/flags"
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/localip"
 	"github.com/webvalera96/go-musthave-metrics/internal/agent/metrics"
+	pb "github.com/webvalera96/go-musthave-metrics/internal/proto/metrics"
 	"github.com/webvalera96/go-musthave-metrics/internal/securepayload"
 	"github.com/webvalera96/go-musthave-metrics/internal/shutdown"
 	"go.uber.org/fx"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var (
@@ -101,8 +104,26 @@ func CryptoPublicKey(cfg *flags.AgentConfig) (*rsa.PublicKey, error) {
 	return securepayload.LoadPublicKey(cfg.CryptoKey)
 }
 
+// GRPCMetricsClient создаёт gRPC-клиент Metrics при заданном GRPCAddr.
+func GRPCMetricsClient(cfg *flags.AgentConfig, lc fx.Lifecycle) (pb.MetricsClient, error) {
+	if cfg.GRPCAddr == "" {
+		return nil, nil
+	}
+	conn, err := grpc.NewClient(cfg.GRPCAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, err
+	}
+	c := pb.NewMetricsClient(conn)
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			return conn.Close()
+		},
+	})
+	return c, nil
+}
+
 // WorkerPoolProvider создает и запускает пул воркеров
-func WorkerPoolProvider(lc fx.Lifecycle, cfg *flags.AgentConfig, collector *metrics.MetricsCollector, client *http.Client, pub *rsa.PublicKey) *metrics.WorkerPool {
+func WorkerPoolProvider(lc fx.Lifecycle, cfg *flags.AgentConfig, collector *metrics.MetricsCollector, client *http.Client, pub *rsa.PublicKey, grpcClient pb.MetricsClient) *metrics.WorkerPool {
 	rateLimit := cfg.RateLimit
 	if rateLimit < 1 {
 		rateLimit = 1
@@ -113,6 +134,7 @@ func WorkerPoolProvider(lc fx.Lifecycle, cfg *flags.AgentConfig, collector *metr
 		cfg.MetricsServer,
 		cfg.Key,
 		pub,
+		grpcClient,
 		localip.Host(),
 		rateLimit,
 		collector.GetMetricsChan(),
@@ -149,6 +171,7 @@ func main() {
 		fx.Provide(
 			flags.NewAgentConfig,
 			CryptoPublicKey,
+			GRPCMetricsClient,
 			MetricsCollectorProvider,
 			HTTPClientProvider,
 			WorkerPoolProvider,

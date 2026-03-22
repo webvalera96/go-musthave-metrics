@@ -21,6 +21,7 @@ type ServerConfig struct {
 	AuditFile     string
 	AuditURL      string
 	TrustedSubnet string
+	GRPCAddr      string
 }
 
 // NewServerConfig парсит JSON (низший приоритет), затем флаги, затем env (высший приоритет).
@@ -36,6 +37,7 @@ func NewServerConfig() *ServerConfig {
 		AuditFile:     "",
 		AuditURL:      "",
 		TrustedSubnet: "",
+		GRPCAddr:      "",
 	}
 
 	if p := configfile.ResolvePath(); p != "" {
@@ -58,6 +60,7 @@ func NewServerConfig() *ServerConfig {
 	flag.StringVar(&cfg.AuditFile, "audit-file", cfg.AuditFile, "path to file for audit logs")
 	flag.StringVar(&cfg.AuditURL, "audit-url", cfg.AuditURL, "full URL to send audit logs via POST")
 	flag.StringVar(&cfg.TrustedSubnet, "t", cfg.TrustedSubnet, "trusted CIDR for agent X-Real-IP (empty = no check)")
+	flag.StringVar(&cfg.GRPCAddr, "grpc", cfg.GRPCAddr, "gRPC listen address for Metrics service (empty = disabled)")
 
 	_ = flag.CommandLine.Parse(configfile.FilterArgs(os.Args)[1:])
 
@@ -105,6 +108,9 @@ func NewServerConfig() *ServerConfig {
 	if v, exist := os.LookupEnv(EnvTrustedSubnet); exist {
 		cfg.TrustedSubnet = v
 	}
+	if v, exist := os.LookupEnv(EnvGRPCAddress); exist {
+		cfg.GRPCAddr = v
+	}
 
 	return cfg
 }
@@ -146,6 +152,9 @@ func applyServerFile(cfg *ServerConfig, s *configfile.Server) error {
 	}
 	if s.TrustedSubnet != nil {
 		cfg.TrustedSubnet = *s.TrustedSubnet
+	}
+	if s.GRPCAddr != nil {
+		cfg.GRPCAddr = *s.GRPCAddr
 	}
 	return nil
 }

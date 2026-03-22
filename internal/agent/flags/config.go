@@ -17,6 +17,7 @@ type AgentConfig struct {
 	Key                string
 	RateLimit          int
 	CryptoKey          string
+	GRPCAddr           string
 }
 
 // NewAgentConfig парсит JSON (низший приоритет), затем флаги, затем env (высший приоритет).
@@ -28,6 +29,7 @@ func NewAgentConfig() *AgentConfig {
 		Key:                "",
 		RateLimit:          1,
 		CryptoKey:          "",
+		GRPCAddr:           "",
 	}
 
 	if p := configfile.ResolvePath(); p != "" {
@@ -46,6 +48,7 @@ func NewAgentConfig() *AgentConfig {
 	flag.StringVar(&cfg.Key, "k", cfg.Key, "hash key for signing requests")
 	flag.StringVar(&cfg.CryptoKey, "crypto-key", cfg.CryptoKey, "path to PEM file with RSA public key for request encryption")
 	flag.IntVar(&cfg.RateLimit, "l", cfg.RateLimit, "rate limit for concurrent requests")
+	flag.StringVar(&cfg.GRPCAddr, "grpc", cfg.GRPCAddr, "gRPC address of Metrics server (optional; if set, metrics are sent via gRPC)")
 
 	_ = flag.CommandLine.Parse(configfile.FilterArgs(os.Args)[1:])
 
@@ -79,6 +82,9 @@ func NewAgentConfig() *AgentConfig {
 	if v, ok := os.LookupEnv(EnvCryptoKey); ok {
 		cfg.CryptoKey = v
 	}
+	if v, ok := os.LookupEnv(EnvGRPCAddress); ok {
+		cfg.GRPCAddr = v
+	}
 
 	return cfg
 }
@@ -108,6 +114,9 @@ func applyAgentFile(cfg *AgentConfig, a *configfile.Agent) error {
 	}
 	if a.CryptoKey != nil {
 		cfg.CryptoKey = *a.CryptoKey
+	}
+	if a.GRPCAddr != nil {
+		cfg.GRPCAddr = *a.GRPCAddr
 	}
 	return nil
 }

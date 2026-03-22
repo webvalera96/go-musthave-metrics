@@ -9,6 +9,9 @@ import (
 // XRealIPHeader — заголовок с IP хоста агента (проверка trusted subnet на сервере).
 const XRealIPHeader = "X-Real-IP"
 
+// XRealIPMetadataKey — ключ метаданных gRPC для передачи IP агента (нижний регистр, как принято в gRPC).
+const XRealIPMetadataKey = "x-real-ip"
+
 // TrustedSubnetMiddleware отклоняет POST запросы с метриками, если X-Real-IP не входит в подсеть.
 // trusted == nil — ограничений нет (пусто в конфиге).
 func TrustedSubnetMiddleware(trusted *net.IPNet, next http.Handler) http.Handler {

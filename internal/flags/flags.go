@@ -13,4 +13,5 @@ const (
 	EnvCryptoKey       = "CRYPTO_KEY"
 	EnvConfig          = "CONFIG"
 	EnvTrustedSubnet   = "TRUSTED_SUBNET"
+	EnvGRPCAddress       = "GRPC_ADDRESS"
 )

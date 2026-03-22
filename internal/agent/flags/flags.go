@@ -9,4 +9,5 @@ const (
 	EnvRateLimit      = "RATE_LIMIT"
 	EnvCryptoKey      = "CRYPTO_KEY"
 	EnvConfig         = "CONFIG"
+	EnvGRPCAddress    = "GRPC_ADDRESS"
 )
